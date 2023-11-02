@@ -1,0 +1,631 @@
+library(RColorBrewer)
+library(circlize) 
+library(scatterpie)
+library(tanggle)
+library(RSplitsTree)
+library(ggmap)
+library(lubridate)
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(ggrepel)
+library(tidyverse)
+library(ggsn)
+library(ggspatial)
+library(readxl)
+library(heatmaply)
+library(circlize)
+library(ComplexHeatmap)
+library(igraph)
+library(SNPRelate)
+library(geosphere)
+library(reshape2)
+library(vegan)
+library(ggforce)
+library(openxlsx)
+library(stringr)
+library(pracma)
+library(ggpubr)
+library(RRtools)
+library(ggthemes)
+library(RColorBrewer)
+library(ozmaps)
+library(adegenet)
+library(tidyr)
+library("pophelper")
+library("viridis")
+library(diveRsity)
+
+
+maindir <- '/Users/eilishmcmaster/Documents/ReCER_base_analysis_pipeline/'
+
+setwd(maindir)
+
+setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = FALSE)
+species <- setup_variables[1,2]
+dataset <- setup_variables[2, 2]
+RandRbase <- ""
+raw_meta_path <- setup_variables[3, 2]
+
+topskip   <- 6
+nmetavar  <- 18
+missingness <- 0.3
+
+species_group <- dms$meta$analyses[,"sp"]
+site_group <- dms$meta$site
+
+
+#Number of analysis columns in metafile
+Num_analyses <- 3
+#Analysis column in meta file you want to run
+analysis.index <- 1
+#Minimum number of samples to keep a population in analyses
+Minimum_pop <- 5
+#Kinship threshold to considered samples as belonging to a single genet
+Clonal_threshold <- 0.4
+#Number of samples to subsample populations to prior to analyses
+samples_per_pop <- 5
+
+
+devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/sos_functions.R?raw=TRUE")
+devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/kin_compare_functions.R?raw=TRUE")
+
+
+#### Import and QC ####
+
+#Load data and quality filter loci and samples
+d1        <- new.read.dart.xls.onerow(RandRbase,species,dataset,topskip, euchits=FALSE, altcount=TRUE)
+qc1       <- report.dart.qc.stats(d1, RandRbase, species, dataset, threshold_missing_loci = 0.8)
+
+d2        <- remove.poor.quality.snps(d1, min_repro=0.96, max_missing=0.2)
+qc2       <- report.dart.qc.stats(d2, RandRbase, species, dataset)
+
+d3        <- sample.one.snp.per.locus.random(d2, seed=214241)
+qc3       <- report.dart.qc.stats(d3, RandRbase, species, dataset)
+
+#Load meta data and attach to dart data
+m1        <- read.meta.data.new(d3, RandRbase, species, dataset)
+m2 <- custom.read(species, dataset) %>% .[which(.$sample %in% m1$sample_names),]
+
+write.table(data.frame(sample=d3$sample_names[!(d3$sample_names %in% m1$sample_names)]), 
+            paste0(species,"/samples_in_dart_not_in_meta.tsv"), sep="\t", row.names = FALSE)
+
+dm        <- dart.meta.data.merge(d3, m1)
+dms <-  dm
+
+  
+#### Colour palettes #### 
+sp_colours <- named_list_maker(species_group, "Spectral", 9)
+
+sp_shapes <- 1:length(unique(species_group))
+names(sp_shapes) <- unique(species_group)
+
+site_colours <- named_list_maker(site_group, "Set3", 12)
+
+site_shapes <- 1:length(unique(site_group))
+names(site_shapes) <- unique(site_group)
+
+#### clones ####
+# find and remove clones using SNPrelate kinship 
+
+#calculate kinship by population 
+# VERY important that the population groups are true genetic groups and not conglomerates of multiple genetic groups
+# this can be species, subpops, or sites 
+kin <- individual_kinship_by_pop(dms, RandRbase, species, dataset, species_group, maf=0.05, mis=0.2, as_bigmat=TRUE)
+
+
+# Finding the clones
+#https://kateto.net/netscix2016.html
+kin2 <- as.data.frame(kin) %>%mutate_all(~replace(.,.<=0.4, 0)) #VERY IMPORTANT, removes all of the pairwise connections that are k<0.45 
+diag(kin2) <- 0
+kin3 <- kin2
+
+kin3<- as.data.frame(kin3) %>%mutate_all(~replace(.,.>0, 1)) # replaces all remaining pairwise connections with 1 (all are equal above k>0.45)
+
+# cluster the clones 
+network <- graph_from_adjacency_matrix(as.matrix(kin3), mode="undirected", diag=F,weighted=T) #makes the network based on k>0.45 
+plot(network)
+
+ceb <- cluster_fast_greedy(network) # makes cluster groupings
+
+#visualise groups
+plot(ceb, network, vertex.label.color="transparent", vertex.size=2, edge.width=0.4) #make the network plot
+
+# get clones 
+clones <-as.data.frame(cbind(genet=ceb$membership, sample=ceb$names)) #get the clones from the network as a df
+clones_out <- merge(clones, m2[,c("sample","lat","long","site","pop_large","sp","raw_fieldNumber","fieldNumber")], by="sample") #add some metadata
+clones_out <- clones_out[order(as.numeric(clones_out$genet)),] #order the table by genet 
+clones_out$genet <- as.numeric(clones_out$genet)
+
+# Export data if you want 
+# write.table(clones_out, paste0(species,"/outputs/clones_out.tsv"), sep="\t", row.names=FALSE, col.names=TRUE)
+clones_out
+write.xlsx(clones_out, paste0(species,"/outputs/20130713_clones_out.xlsx"), asTable = FALSE, overwrite = TRUE)
+
+
+# Remove duplicate clones from working data
+#close clones with highest quality data (least missingess)
+missingness_gt <- as.data.frame(rowSums(is.na(dms[["gt"]]))/ncol(dms[["gt"]])) #get missingness of all samples
+colnames(missingness_gt) <- "missingness"
+clone_missing <- merge(clones_out, missingness_gt, by.x="sample", by.y=0) # merge the clone data
+clone_missing <- clone_missing[order(clone_missing$missingness),] #order by missingness low to high
+
+unique_genets <- distinct(clone_missing, genet, .keep_all=TRUE) #keeps the top result for each genet (lowest missingness)
+
+#make a list removing duplicate clones
+non_clones <- dms$sample_names[which(!dms$sample_names %in% clones_out$sample)]
+approved_clones <- unique_genets$sample
+
+clones_dereplicated <- c(non_clones, approved_clones) # list of sample to keep
+
+# remove clones from dms
+# dms <- remove.by.list(dms, clones_dereplicated)
+
+
+#### final sample number summary ####
+
+# Original Site Summary
+original_site_summary <- dms$meta$analyses %>% as.data.frame()%>%
+  group_by(pop, pop_large, genetic_group2) %>%
+  summarize(n_original = sum(n())) %>%
+  filter(n_original > 0) %>%
+  as.data.frame()
+
+# Clones Removed Site Summary
+clones_removed_site_summary <- dms$meta$analyses %>% as.data.frame()%>%
+  group_by(pop, pop_large, genetic_group2) %>%
+  summarize(n_original = sum(n())) %>%
+  as.data.frame()
+colnames(clones_removed_site_summary)[4] <-"n_no_clones"
+
+# Merge Site Samples Summary
+site_samples_summary <- merge(original_site_summary, clones_removed_site_summary,
+                              by = c("pop", "pop_large","genetic_group2"), all.x = TRUE)
+
+
+site_samples_summary <- site_samples_summary[,c(3,2,1,4,5)]
+
+
+# Calculate total values per unique site_samples_summary[,1] value
+total_summary <- site_samples_summary %>%
+  group_by(genetic_group2) %>%
+  summarize(n_original = sum(n_original, na.rm=TRUE), n_no_clones = sum(n_no_clones, na.rm=TRUE)) %>%
+  mutate(pop_large = "Total") %>%
+  mutate(pop = "x") %>%
+  as.data.frame()
+
+# Combine the original and total summaries
+final_summary <- rbind(site_samples_summary, total_summary)
+
+final_summary <- final_summary[order(final_summary[,1], final_summary[,3], final_summary[,2]), ]
+final_summary[final_summary$pop=="x","pop"] <- ""
+
+colnames(final_summary) <- c("Genetic group","Subpopulation","Site", "n (original)","n (no clones)")
+
+final_summary
+######
+
+write.xlsx(final_summary, paste0(species,"/outputs/20130713_sites_sample_summary.xlsx"), asTable = FALSE, overwrite = TRUE)
+
+
+#### kinship heatmap
+#### Kinship by distance ####
+
+col_fun2 = colorRamp2(c(0,0.2,0.4), c("white", "red","black"))
+
+
+# kinship_df <- dist_kinship_matrix(dms$gt) %>% as.data.frame(.)
+# kinship_df$sample <- rownames(kinship_df)
+
+kinship_df <- kin %>% as.data.frame()
+kinship_df$sample <- rownames(kinship_df)
+
+
+hm_sites2 <- merge(kinship_df, m2[,c("sample","site","sp", "lat", "long","pop", "pop_large","genetic_group2")],
+                   by="sample", all.x=TRUE, all.y=FALSE)
+hm_sites2 <- hm_sites2[match(rownames(kinship_df),hm_sites2$sample),]
+rownames(hm_sites2) <- hm_sites2[,"sample"]
+
+hm_sites <- hm_sites2
+hm_sites2[,"sample"] <- NULL
+
+
+#create annotations
+
+site_ann <- HeatmapAnnotation(Location = hm_sites2$site,
+                              col=list(Location=site_colours))
+
+
+sp_ann <- HeatmapAnnotation(Species = hm_sites2$sp,
+                            col=list(Species=sp_colours),
+                            na_col="white",
+                            annotation_legend_param = list(labels_gp=gpar(fontface="italic")),
+                            annotation_name_gp = gpar(fontsize = 10),
+                            annotation_name_side="left")
+
+
+
+hma <- Heatmap( as.matrix(hm_sites2[ , c(1:(nrow(hm_sites2)))]), 
+                col=col_fun2, 
+                bottom_annotation=c(site_ann, sp_ann),
+                name = "Genetic similarity", #title of legend
+                row_names_gp = gpar(fontsize = 0),
+                column_names_gp = gpar(fontsize = 0),
+                row_names_max_width = unit(15, "cm"),
+                border_gp = gpar(col = "black", lty = 1),
+                column_order=order(hm_sites2$genetic_group2),
+                row_order=order(hm_sites2$genetic_group2)
+)
+
+
+draw(hma, merge_legend = TRUE)
+#### diversity stats ####
+
+# site_stats <- species_site_stats(dms, maf=0.05, pop_var="sp", site_var="site", missing=0.2)
+# big_site_stats <- species_site_stats(dms, maf=0.05, pop_var="sp", site_var="pop_large", missing=0.2)
+# gg_stats <- species_site_stats(dms, 0.05, "sp", "genetic_group2",missing=0.2)
+# gg_separate_stats <- multispecies_stats(dms, 0.05, var=dms$meta$analyses[,"genetic_group2"], missing=0.2)
+
+# write.xlsx(site_stats[,c(14,1,15,2,4,5,7,13)], file="PherFitz/outputs/20230822_site_stats_0.05.xlsx", rowNames=TRUE)
+# write.xlsx(big_site_stats[,c(14,1,15,2,4,5,7,13)], file="PherFitz/outputs/20230822_pop_large_stats_0.05.xlsx", rowNames=TRUE)
+# write.xlsx(gg_stats[,c(14,1,15,2,4,5,7,13)], file="PherFitz/outputs/20230822_sp_stats_0.05.xlsx", rowNames=TRUE)
+# write.xlsx(gg_separate_stats[,c(13,1,3,4,6,12)], file="PherFitz/outputs/20230822_gg_separate_stats_0.05.xlsx", rowNames=TRUE)
+
+
+dms_pf_0.05_miss20 <- remove.poor.quality.snps(dms_pf, min_repro=0.96, max_missing=0.2) %>%
+  remove.by.maf(., 0.05)
+
+fitz_allele_list <- make_allele_list(dms_pf_0.05_miss20, dms_pf_0.05_miss20$meta$analyses[,"pop_large_short"], min_af = 0)
+
+private_total_alleles <- calculate_private_alleles(fitz_allele_list[c(1:3,5:11)])
+private_total_alleles
+
+#### PCA: all species ####
+gen_d5 <- new("genlight", dms[["gt"]]) #convert df to genlight object for glPca function
+gen_pca <- glPca(gen_d5, parallel=TRUE, nf=5) #do pca -- this method allows the input to have NAs 
+g_pca_df <- gen_pca[["scores"]] #extract PCs 
+g_pca_df2 <- merge(g_pca_df, m2, by.x=0, by.y="sample", all.y=FALSE, all.x=FALSE) # add metadata 
+
+pcnames <- paste0(colnames(g_pca_df)," (",
+                  paste(round(gen_pca[["eig"]][1:5]/sum(gen_pca[["eig"]]) *100, 2)),
+                  "%)") #create names for axes
+
+
+pca_plot <- ggplot(g_pca_df2, aes(x=PC1, y=PC2, colour=genetic_group2))+ 
+  geom_point()+theme_bw()+
+  labs(colour="Genetic group")+xlab(pcnames[1])+ylab(pcnames[2])+
+  theme(legend.key.size = unit(0, 'lines'),# legend.position = "right",
+        legend.text=element_text(face="italic"))+
+  # guides(colour = guide_legend(title.position = "top", direction = "vertical"))+
+  scale_colour_manual(values=genetic_group2_colours)
+pca_plot
+
+
+
+#### FST ####
+
+# remove sites where n=1
+sppop_freq <- as.data.frame(table(dms$meta$site))
+not_n1_sites <- as.vector(sppop_freq[sppop_freq$Freq<=1,1]) #remove groups where n<=1
+not_n1_samples <- dms$sample_names[which(!(dms$meta$site %in% not_n1_sites))]
+fst_dms <- remove.by.list(dms, not_n1_samples)
+
+
+# calculate FST and geodist
+gds_file <- dart2gds(fst_dms, RandRbase, species, dataset)
+pFst      <- population.pw.Fst(fst_dms, fst_dms$meta$site, RandRbase,species,dataset, maf_val=0.05, miss_val=0.2) #calculates genetic distance 
+pS        <- population.pw.spatial.dist(fst_dms, fst_dms$meta$site) #calculates geographic distance between populations
+
+
+####plot IBD plot
+
+# Make self comparisons NA
+diag(pFst$Fst) <- NA
+diag(pS$S) <- NA
+
+#Mantel test 
+man <- mantel(xdis = pS$S, ydis = pFst$Fst, permutations = 10000, na.rm = TRUE) #mantel test, finds if matrices are signficantly similar
+man
+
+# mantel plot
+Fst_sig <- cbind(melt(pS$S), unlist(as.list(pFst$Fst)))
+colnames(Fst_sig)[3] <- "Geo_dist"
+colnames(Fst_sig)[4] <- "Fst"
+Fst_sig$Geo_dist2 <-Fst_sig$Geo_dist/1000 
+
+meta_agg <- m2 %>%
+  group_by(genetic_group, site) %>%
+  summarize(lat = mean(lat, na.rm=TRUE),
+            long = mean(long,na.rm=TRUE),
+            .groups = 'drop')
+
+# adding metadata for sites
+Fst_sig2 <- merge(Fst_sig, distinct(meta_agg[,c("site","genetic_group")]), by.x="Var1", by.y="site", all.y=FALSE)
+Fst_sig2 <- merge(Fst_sig2, distinct(meta_agg[,c("site","genetic_group")]), by.x="Var2", by.y="site", all.y=FALSE)
+Fst_sig2$same_sp <- ifelse(Fst_sig2$genetic_group.x == Fst_sig2$genetic_group.y, "Within group", "Between group")
+
+fstp1<- ggplot(Fst_sig2, aes(x= Geo_dist2, y=Fst, color=same_sp))+geom_point(size=1, alpha=0.3)+
+  labs(x="Distance (km)", y="FST", colour="Comparison")+
+  facet_zoom(x=Geo_dist2<2, zoom.size=1)+theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position="bottom")
+fstp1
+
+ggsave("PherFitz/outputs/plots/PherFitz_manning_fst.png",
+       fstp1, width = 15, height = 15, units = "cm", dpi=600)
+
+paste("Mantel statistic r is", round(man$statistic, 3), ", P =", man$signif)
+
+
+# Make heatmaps
+# geo dist
+geo_d <-pS$S #this is a square matrix
+mat <- geo_d/1000 # convert to km 
+
+#FST
+mat2 <-pFst$Fst
+agg <- unique(m2[, c("site", "pop_large")]) # create aggregated df of pop_largeecies and site
+mat2 <- merge(mat2, agg, by.x=0, by.y="site", all.y=FALSE) #add aggregated df to mat2 (fst)
+rownames(mat2) <- mat2$Row.names
+
+mat2$Row.names <- NULL
+mat2 <- mat2[match(colnames(mat2)[1:nrow(mat2)],rownames(mat2)),]
+
+order_hm <- Heatmap(mat,
+                    cluster_rows = TRUE,
+                    cluster_columns = TRUE)
+od <- colnames(mat)[column_order(order_hm)]
+
+mat = mat[od, od]
+mat2 = mat2[od, c(od,"pop_large")]
+
+# specify fst heatmap colours 
+gene_col <-  colorRamp2(c(0,0.5,1), c("#8DD3C7", "white", "#FB8072"))
+
+
+#specify geo heatmap colours
+palette <-  colorRamp2(c(0, max(mat, na.rm=TRUE)), c("white", "#80B1D3"))
+
+
+row_Subpopulation_ann <- rowAnnotation(Subpopulation = mat2$pop_large,
+                                       col=list(Subpopulation=pop_colours),
+                                       na_col="white",
+                                       annotation_legend_param = list(labels_gp=gpar(fontsize=6),#fontface="italic",
+                                                                      title_gp=gpar(fontsize=8)),
+                                       annotation_name_gp = gpar(fontsize = 0),
+                                       annotation_name_side="top")
+
+bottom_Subpopulation_ann <- HeatmapAnnotation(Subpopulation = mat2$pop_large, col = list(Subpopulation = pop_colours),
+                                              annotation_name_gp = gpar(fontsize = 0),
+                                              show_legend = FALSE,
+                                              annotation_name_side="right",
+                                              na_col = "white")
+
+geo <- Heatmap(mat,rect_gp = gpar(type = "none"),
+               width = nrow(mat)*unit(4, "mm"),
+               height = nrow(mat)*unit(4, "mm"),
+               col=palette,na_col="white",
+               bottom_annotation = bottom_Subpopulation_ann,
+               column_names_gp = gpar(fontsize = 6),
+               cluster_rows = FALSE,
+               cluster_columns = FALSE,
+               name="Distance (km)",
+               heatmap_legend_param = list(title_gp = gpar(fontsize = 8),
+                                           labels_gp = gpar(fontsize = 6)),
+               # cluster_rows = TRUE, 
+               # cluster_columns = TRUE,
+               cell_fun = function(j, i, x, y, w, h, fill) {
+                 if(i >= j) {
+                   grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+                 }
+               }
+)
+
+# make fst heatmap
+gene <- Heatmap(as.matrix(mat2[,1:nrow(mat2)]), rect_gp = gpar(type = "none"),
+                width = nrow(mat2)*unit(4, "mm"),
+                height = nrow(mat2)*unit(4, "mm"),
+                right_annotation = row_Subpopulation_ann,
+                col=gene_col,na_col="grey",
+                row_names_gp = gpar(fontsize = 6),
+                column_names_gp = gpar(fontsize = 0),
+                border_gp = gpar(col = "black", lty = 1),
+                name="FST",
+                cluster_rows = FALSE,
+                cluster_columns = FALSE,
+                heatmap_legend_param = list(title_gp = gpar(fontsize = 8),
+                                            labels_gp = gpar(fontsize = 6)),
+                cell_fun = function(j, i, x, y, w, h, fill) {
+                  if(i <= j) {
+                    grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+                    grid.text(sprintf("%.2f", mat2[,1:nrow(mat2)][i, j]), x, y, gp = gpar(fontsize = 4))
+                  }
+                })
+
+gene_width <- nrow(mat2)*unit(4, "mm")
+
+draw(geo + gene, ht_gap = -gene_width)
+
+# Set the file name and parameters
+filename <- "/Users/eilishmcmaster/Documents/PherFitz/PherFitz/outputs/plots/fst_plot_overlay.png"
+width <- 16
+height <- 12
+dpi <- 600
+units <- "cm"
+
+# Set up the PNG device
+png(filename, width = width, height = height, units = units, res = dpi)
+
+# Draw the plot
+draw(geo + gene, ht_gap = -gene_width)
+
+# Turn off the PNG device
+dev.off()
+
+
+#### Visualise splitstree ####
+
+# splitstree(dist(dms$gt), 'PherFitz/outputs/all_pher_nexus_file_for_R.nex')
+
+#need to open and save the file in Splitstree app for it to open here, IDK why
+Nnet <- phangorn::read.nexus.networx('PherFitz/outputs/all_pher_nexus_file_for_R.nex')
+# mat2[match(colnames(mat2)[1:nrow(mat2)],rownames(mat2)),]
+
+x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
+                sample=rep(NA, nrow(Nnet$.plot$vertices)))
+
+
+
+x[Nnet$translate$node,"sample"] <- Nnet$translate$label
+x <- merge(x, m2, by="sample", all.x=TRUE, all.y=FALSE)
+
+net_x_axis <- max(x$x)-min(x$x)
+net_y_axis <- max(x$y)-min(x$y)
+
+Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), "site"] %>% .[1:length(Nnet$tip.label)]
+
+
+
+splitstree_plot <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
+                          as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
+                          ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
+                          ndigits = NULL)+
+  geom_splitnet(layout = "slanted", size=0.2)+
+  geom_point(data=x, aes(x, y, colour=genetic_group2))+
+  scale_colour_manual(values=genetic_group2_colours, na.translate=FALSE,
+                      guide = guide_legend("Genetic group"))+
+  # geom_tiplab2(size=2, hjust=-0.2)+
+  theme_void()+
+  expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
+                y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
+  theme(legend.text = element_text(face="italic"), legend.position = "top")+coord_fixed()
+
+splitstree_plot
+
+
+
+# dms_pf_clones_in <- remove.by.list(dms, fitz_samples) %>% remove.poor.quality.snps(., min_repro=0.96, max_missing=0.2)
+# splitstree(dist(dms_pf_clones_in$gt), 'PherFitz/outputs/Pf_nexus_file_for_R_clones_in.nex')
+# splitstree(dist(dms_pf$gt), 'PherFitz/outputs/Pf_nexus_file_for_R.nex')
+
+Nnet2 <- phangorn::read.nexus.networx('PherFitz/outputs/Pf_nexus_file_for_R.nex')
+
+x2 <- data.frame(x=Nnet2$.plot$vertices[,1], y=Nnet2$.plot$vertices[,2], 
+                 sample=rep(NA, nrow(Nnet2$.plot$vertices)))
+
+
+x2[Nnet2$translate$node,"sample"] <- Nnet2$translate$label
+x2 <- merge(x2, m2, by="sample", all.x=TRUE, all.y=FALSE)
+
+net_x_axis <- max(x2$x)-min(x2$x)
+net_y_axis <- max(x2$y)-min(x2$y)
+
+Nnet2$translate$label <-  x2[match(Nnet2$tip.label, x2$sample), "site"] %>% .[1:length(Nnet2$tip.label)]
+
+
+# v1_chull <- x[which(x$sp ==1),] %>% slice(chull(x,y))
+
+splitstree_plot2 <- ggplot(Nnet2, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
+                           as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
+                           ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
+                           ndigits = NULL)+
+  geom_splitnet(layout = "slanted", size=0.2)+
+  geom_point(data=x2, aes(x,y, colour=pop_large, shape=pop_large))+
+  scale_colour_manual(values=pop_colours, na.translate=TRUE,
+                      guide = guide_legend("Subpopulation"))+ #override.aes = list(shape = 21)
+  scale_shape_manual(values=sp_shapes, na.translate=FALSE,
+                     guide = guide_legend("Subpopulation"))+
+  theme_void()+
+  expand_limits(x=c(min(x2$x)-0.01*net_x_axis, max(x2$x)+0.01*net_x_axis),
+                y=c(min(x2$y)-0.01*net_y_axis, max(x2$y)+0.01*net_y_axis))+
+  theme(legend.text = element_text(face="italic"), legend.position = "right")+coord_fixed()+ geom_tiplab2(size=2, hjust=-0.3)
+
+splitstree_plot2
+
+
+ggsave("PherFitz/outputs/plots/small_splitstree.png", plot = splitstree_plot2, width = 150, height = 150, dpi = 600, units = "mm")
+
+
+
+gg_pca <- ggarrange(pca_plot, pf_genetic_group_pca, common.legend = TRUE, labels=c("A", "B"), legend="none")#+bgcolor("white")
+
+genetic_group_pca_splitstree <- ggarrange(gg_pca, splitstree_plot, nrow=2, 
+                                          labels=c("","C"), common.legend = TRUE, legend="bottom")#+bgcolor("white")
+genetic_group_pca_splitstree
+ggsave("PherFitz/outputs/plots/genetic_group_pca_splitstree.png", plot = genetic_group_pca_splitstree, width = 200, height = 200, dpi = 600, units = "mm")
+
+
+pher_fitz_pca_tree <- ggarrange(pop_pca,splitstree_plot2,nrow=1, widths=c(2,2,2), labels=c("A","B","C"),legend="bottom", common.legend=TRUE)#+bgcolor("white")
+pher_fitz_pca_tree
+ggsave("PherFitz/outputs/plots/pher_fitz_pca_tree.png", plot = pher_fitz_pca_tree, width = 200, height = 130, dpi = 600, units = "mm")
+
+
+meta_all_fitz1 <- subset(m2, sp == "Pherosphaera fitzgeraldii" & !(site %like% "Ex_situ"))  # all collected fitz
+
+meta_all_fitz <- meta_all_fitz1 %>%
+  group_by(pop_large, pop_large_short) %>%
+  summarize(lat = mean(lat, na.rm=TRUE),
+            long = mean(long,na.rm=TRUE),
+            .groups = 'drop')
+
+
+# map by species
+bound <- c(
+  left = min(meta_all_fitz$long, na.rm = T) - 0.05, bottom = min(meta_all_fitz$lat, na.rm = T) - 0.05,
+  right = max(meta_all_fitz$long, na.rm = T) + 0.05, top = max(meta_all_fitz$lat, na.rm = T) + 0.05)
+
+
+map <- ggmap::get_stadiamap(bbox = bound, zoom=14, scale=4, 
+                            maptype="stamen_terrain",
+                            color="bw") %>%
+  ggmap::ggmap()
+
+
+
+bw_map <-  map + coord_fixed()+
+  geom_point(aes(x = long, y = lat,  shape = pop_large), fill = "white",
+             stroke=0,data = meta_all_fitz, shape=21,size = 4.5,alpha=0.8) +
+  geom_point(aes(x = long, y = lat, color = pop_large, shape = pop_large), data = meta_all_fitz, size = 2, alpha = 1) + 
+  scale_colour_manual(values=pop_colours, na.translate=TRUE,
+                      guide = guide_legend("Subpopulation"))+ #override.aes = list(shape = 21)
+  scale_shape_manual(values=sp_shapes, na.translate=FALSE,
+                     guide = guide_legend("Subpopulation"))+    theme(legend.position = "bottom") +
+  theme(legend.title=element_blank()) +
+  labs(x = "Longitude", y = "Latitude") +
+  ggsn::scalebar(meta_all_fitz, dist = 1, dist_unit = "km", location = "bottomright", 
+                 st.bottom = F, st.size = 3, st.dist = 0.04,border.size =0.5,
+                 transform = TRUE, model = "WGS84", height = 0.02) +
+  annotation_north_arrow(location = "tr", which_north = "true", pad_x = unit(0.2, "in"), pad_y = unit(0.2, "in"), style = north_arrow_fancy_orienteering)+
+  xlim(min(meta_all_fitz$long)-0.005, max(meta_all_fitz$long)+0.005)+
+  ylim(min(meta_all_fitz$lat)-0.005, max(meta_all_fitz$lat)+0.005)+
+  theme_bw()+
+  ggrepel::geom_label_repel(data = meta_all_fitz,aes(x = long, y = lat, label=pop_large_short),
+                            min.segment.length=0.25, color="black",fill="white",size=3, segment.colour="white", alpha=0.9, label.size=0)
+
+bw_map
+
+ggsave("PherFitz/outputs/plots/pher_fitz_map.png", plot = bw_map, width = 200, height = 85, dpi = 600, units = "mm")
+
+
+
+lims <- c(150.27103, 150.378419148936, -33.7563, -33.6996072727273)
+
+fst_map <- map+theme_bw()+
+  geom_segment(data=pop_Fst_sig2[pop_Fst_sig2$Fst<=0.5,],
+               aes(x=long.x, y=lat.x,
+                   xend = long.y, yend = lat.y,
+                   size = 1, colour=Fst, alpha=0.5-Fst), lineend = "round")+
+  scale_color_gradient(low = "#8DD3C7", high = "white")+
+  geom_text(data=pop_Fst_sig2[pop_Fst_sig2$Fst<=0.5,],
+            aes(label = round(Fst, 2), x = (long.x + long.y) / 2, y = (lat.y+lat.x) / 2),
+            size = 2,
+            color = "black")+
+  geom_point(data=meta_all_fitz, mapping=aes(x=long, y=lat))+
+  xlim(lims[1], lims[2])+
+  ylim(lims[3], lims[4])+   labs(x = "Longitude", y = "Latitude", colour="FST") +guides(size = "none", alpha="none")+
+  ggrepel::geom_label_repel(data = meta_all_fitz,aes(x = long, y = lat, label=pop_large_short),
+                            min.segment.length=0.25, color="black",fill="white",size=3, segment.colour="white", alpha=0.9, label.size=0, nudge_y=0.004)
+
+ggsave('/Users/eilishmcmaster/Documents/PherFitz/PherFitz/outputs/plots/fst_map.png',fst_map, width = 200, height = 110, dpi = 600, units = "mm")
+
+
+
