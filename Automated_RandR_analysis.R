@@ -5,6 +5,11 @@ library(diveRsity)
 library(data.table)
 library(LEA)
 library(mapplots)
+library(geosphere)
+library(dplyr)
+library(igraph)
+library(stringr)
+library(openxlsx)
 
 
 devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/sos_functions.R?raw=TRUE")
@@ -18,6 +23,19 @@ load("PSFsaved_scripts4autom2.RData")
 maindir <- '/Users/eilishmcmaster/Documents/ReCER_base_analysis_pipeline/'
 
 setwd(maindir)
+
+
+
+setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = FALSE)
+
+
+species <- setup_variables[1,2]
+dataset <- setup_variables[2, 2]
+RandRbase <- ""
+raw_meta_path <- setup_variables[3, 2]
+
+
+
 #Number of analysis columns in metafile
 Num_analyses <- 3
 #Analysis column in meta file you want to run
@@ -76,7 +94,9 @@ nd_gl  <- dart2gl(dms, RandRbase, species, dataset)
 nd_gl <- gl.compliance.check(nd_gl)
 nd_pca <- gl.pcoa(nd_gl, nf = 5, parallel = FALSE)
 
-PCA_plots(nd_pca)
+# PCA_plots(nd_pca)
+test_pca(nd_pca)
+
 
 ###########################################FST########################################
 #generate pairwise fst for populations

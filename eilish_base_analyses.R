@@ -540,19 +540,14 @@ write.xlsx(list(geo_dist_km=mat, fst=mat2),
             paste0(species,"/outputs/tables/geodist_FST_by_",site_col_name,".xlsx"),rowNames = FALSE)
 
 #### Visualise splitstree ####
-snp <- dart2splitstree(dms, RandRbase, species, dataset,  site_col_name, add_pop=TRUE)
 
-dart2
 splitstree(dist(dms$gt), paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
 
 #need to open and save the file in Splitstree app for it to open here, IDK why
 Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
-# mat2[match(colnames(mat2)[1:nrow(mat2)],rownames(mat2)),]
 
 x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
                 sample=rep(NA, nrow(Nnet$.plot$vertices)))
-
-
 
 x[Nnet$translate$node,"sample"] <- Nnet$translate$label
 x <- merge(x, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
@@ -564,147 +559,61 @@ Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .
 
 
 
-splitstree_plot <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
+splitstree_plot_species <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
                           as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
                           ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
                           ndigits = NULL)+
   geom_splitnet(layout = "slanted", size=0.2)+
   geom_point(data=x, aes(x, y, colour=!!sym(species_col_name)))+
   scale_colour_manual(values=sp_colours, na.translate=FALSE,
-                      guide = guide_legend("Genetic group"))+
+                      guide = guide_legend(species_col_name))+
   # geom_tiplab2(size=2, hjust=-0.2)+
   theme_void()+
   expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
                 y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
   theme(legend.text = element_text(face="italic"), legend.position = "top")+coord_fixed()
 
-splitstree_plot
+splitstree_plot_species
+
+## site splitstree
+Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
+
+x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
+                sample=rep(NA, nrow(Nnet$.plot$vertices)))
+
+x[Nnet$translate$node,"sample"] <- Nnet$translate$label
+x <- merge(x, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
+
+net_x_axis <- max(x$x)-min(x$x)
+net_y_axis <- max(x$y)-min(x$y)
+
+Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .[1:length(Nnet$tip.label)]
 
 
 
-# dms_pf_clones_in <- remove.by.list(dms, fitz_samples) %>% remove.poor.quality.snps(., min_repro=0.96, max_missing=0.2)
-# splitstree(dist(dms_pf_clones_in$gt), 'PherFitz/outputs/Pf_nexus_file_for_R_clones_in.nex')
-# splitstree(dist(dms_pf$gt), 'PherFitz/outputs/Pf_nexus_file_for_R.nex')
-
-Nnet2 <- phangorn::read.nexus.networx('PherFitz/outputs/Pf_nexus_file_for_R.nex')
-
-x2 <- data.frame(x=Nnet2$.plot$vertices[,1], y=Nnet2$.plot$vertices[,2], 
-                 sample=rep(NA, nrow(Nnet2$.plot$vertices)))
-
-
-x2[Nnet2$translate$node,"sample"] <- Nnet2$translate$label
-x2 <- merge(x2, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
-
-net_x_axis <- max(x2$x)-min(x2$x)
-net_y_axis <- max(x2$y)-min(x2$y)
-
-Nnet2$translate$label <-  x2[match(Nnet2$tip.label, x2$sample), site_col_name] %>% .[1:length(Nnet2$tip.label)]
-
-
-# v1_chull <- x[which(x$sp ==1),] %>% slice(chull(x,y))
-
-splitstree_plot2 <- ggplot(Nnet2, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
-                           as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
-                           ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
-                           ndigits = NULL)+
+splitstree_plot_site <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
+                                  as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
+                                  ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
+                                  ndigits = NULL)+
   geom_splitnet(layout = "slanted", size=0.2)+
-  geom_point(data=x2, aes(x,y, colour=!!sym(site_col_name), shape=!!sym(site_col_name)))+
-  scale_colour_manual(values=pop_colours, na.translate=TRUE,
-                      guide = guide_legend("Subpopulation"))+ #override.aes = list(shape = 21)
-  scale_shape_manual(values=sp_shapes, na.translate=FALSE,
-                     guide = guide_legend("Subpopulation"))+
+  geom_point(data=x, aes(x, y, colour=!!sym(site_col_name)))+
+  scale_colour_manual(values=site_colours, na.translate=FALSE,
+                      guide = guide_legend(site_col_name))+
+  geom_tiplab2(size=2, hjust=-3)+
   theme_void()+
-  expand_limits(x=c(min(x2$x)-0.01*net_x_axis, max(x2$x)+0.01*net_x_axis),
-                y=c(min(x2$y)-0.01*net_y_axis, max(x2$y)+0.01*net_y_axis))+
-  theme(legend.text = element_text(face="italic"), legend.position = "right")+coord_fixed()+ geom_tiplab2(size=2, hjust=-0.3)
+  expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
+                y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
+  theme(legend.text = element_text(face="italic"), legend.position = "none")+coord_fixed()
 
-splitstree_plot2
-
-
-ggsave(paste0(species,"/outputs/plots/small_splitstree.png"), plot = splitstree_plot2, width = 150, height = 150, dpi = 600, units = "mm")
+splitstree_plot_site
 
 
-
-gg_pca <- ggarrange(pca_plot, pf_genetic_group_pca, common.legend = TRUE, labels=c("A", "B"), legend="none")#+bgcolor("white")
-
-genetic_group_pca_splitstree <- ggarrange(gg_pca, splitstree_plot, nrow=2, 
-                                          labels=c("","C"), common.legend = TRUE, legend="bottom")#+bgcolor("white")
-genetic_group_pca_splitstree
-ggsave(paste0(species,"/outputs/plots/genetic_group_pca_splitstree.png"), plot = genetic_group_pca_splitstree, width = 200, height = 200, dpi = 600, units = "mm")
-
-
-pher_fitz_pca_tree <- ggarrange(pop_pca,splitstree_plot2,nrow=1, widths=c(2,2,2), labels=c("A","B","C"),legend="bottom", common.legend=TRUE)#+bgcolor("white")
-pher_fitz_pca_tree
-ggsave(paste0(species,"/outputs/plots/pher_fitz_pca_tree.png"), plot = pher_fitz_pca_tree, width = 200, height = 130, dpi = 600, units = "mm")
-
-
-meta_all_fitz1 <- subset(m2, sp == "Pherosphaera fitzgeraldii" & !(site %like% "Ex_situ"))  # all collected fitz
-
-meta_all_fitz <- meta_all_fitz1 %>%
-  group_by(pop_large, pop_large_short) %>%
-  summarize(lat = mean(lat, na.rm=TRUE),
-            long = mean(long,na.rm=TRUE),
-            .groups = 'drop')
+ggsave(paste0(species,"/outputs/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
 
 
 # map by species
-bound <- c(
-  left = min(meta_all_fitz$long, na.rm = T) - 0.05, bottom = min(meta_all_fitz$lat, na.rm = T) - 0.05,
-  right = max(meta_all_fitz$long, na.rm = T) + 0.05, top = max(meta_all_fitz$lat, na.rm = T) + 0.05)
 
-
-map <- ggmap::get_stadiamap(bbox = bound, zoom=14, scale=4, 
-                            maptype="stamen_terrain",
-                            color="bw") %>%
-  ggmap::ggmap()
-
-
-
-bw_map <-  map + coord_fixed()+
-  geom_point(aes(x = long, y = lat,  shape = !!sym(site_col_name)), fill = "white",
-             stroke=0,data = meta_all_fitz, shape=21,size = 4.5,alpha=0.8) +
-  geom_point(aes(x = long, y = lat, color = pop_large, shape = !!sym(site_col_name)), data = meta_all_fitz, size = 2, alpha = 1) + 
-  scale_colour_manual(values=pop_colours, na.translate=TRUE,
-                      guide = guide_legend("Subpopulation"))+ #override.aes = list(shape = 21)
-  scale_shape_manual(values=sp_shapes, na.translate=FALSE,
-                     guide = guide_legend("Subpopulation"))+    theme(legend.position = "bottom") +
-  theme(legend.title=element_blank()) +
-  labs(x = "Longitude", y = "Latitude") +
-  ggsn::scalebar(meta_all_fitz, dist = 1, dist_unit = "km", location = "bottomright", 
-                 st.bottom = F, st.size = 3, st.dist = 0.04,border.size =0.5,
-                 transform = TRUE, model = "WGS84", height = 0.02) +
-  annotation_north_arrow(location = "tr", which_north = "true", pad_x = unit(0.2, "in"), pad_y = unit(0.2, "in"), style = north_arrow_fancy_orienteering)+
-  xlim(min(meta_all_fitz$long)-0.005, max(meta_all_fitz$long)+0.005)+
-  ylim(min(meta_all_fitz$lat)-0.005, max(meta_all_fitz$lat)+0.005)+
-  theme_few()+
-  ggrepel::geom_label_repel(data = meta_all_fitz,aes(x = long, y = lat, label=pop_large_short),
-                            min.segment.length=0.25, color="black",fill="white",size=3, segment.colour="white", alpha=0.9, label.size=0)
-
-bw_map
-
-ggsave(paste0(species,"/outputs/plots/pher_fitz_map.png"), plot = bw_map, width = 200, height = 85, dpi = 600, units = "mm")
-
-
-
-lims <- c(150.27103, 150.378419148936, -33.7563, -33.6996072727273)
-
-fst_map <- map+theme_few()+
-  geom_segment(data=pop_Fst_sig2[pop_Fst_sig2$Fst<=0.5,],
-               aes(x=long.x, y=lat.x,
-                   xend = long.y, yend = lat.y,
-                   size = 1, colour=Fst, alpha=0.5-Fst), lineend = "round")+
-  scale_color_gradient(low = "#8DD3C7", high = "white")+
-  geom_text(data=pop_Fst_sig2[pop_Fst_sig2$Fst<=0.5,],
-            aes(label = round(Fst, 2), x = (long.x + long.y) / 2, y = (lat.y+lat.x) / 2),
-            size = 2,
-            color = "black")+
-  geom_point(data=meta_all_fitz, mapping=aes(x=long, y=lat))+
-  xlim(lims[1], lims[2])+
-  ylim(lims[3], lims[4])+   labs(x = "Longitude", y = "Latitude", colour="FST") +guides(size = "none", alpha="none")+
-  ggrepel::geom_label_repel(data = meta_all_fitz,aes(x = long, y = lat, label=pop_large_short),
-                            min.segment.length=0.25, color="black",fill="white",size=3, segment.colour="white", alpha=0.9, label.size=0, nudge_y=0.004)
-
-ggsave('PherFitz/outputs/plots/fst_map.png',fst_map, width = 200, height = 110, dpi = 600, units = "mm")
-
-
-
+# TO DO 
+# LEA PLOTYS WITH MAPS
+# SITE MAP
+# DIVERSITY STATS
