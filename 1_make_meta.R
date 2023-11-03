@@ -16,7 +16,6 @@ raw_meta_path <- setup_variables[3, 2]
 #####################  check for subdirs and make ##################### 
 
 # Define the subdirectories you want to check and create
-subdirectories <- c("meta", "dart_raw", "popgen", "qual_stat")
 
 if (!dir.exists(species)) {
   dir.create(species, recursive = TRUE)
@@ -25,8 +24,25 @@ if (!dir.exists(species)) {
   cat(paste("Directory already exists:", species, "\n"))
 }
 
+subdirectories <- c("meta", "dart_raw", "popgen", "qual_stat", "outputs")
+
 # Check and create subdirectories if they don't exist
 for (subdir in subdirectories) {
+  
+  subdirectory_path <- file.path(paste0(species,'/',subdir))
+  
+  if (!dir.exists(subdirectory_path)) {
+    dir.create(subdirectory_path, recursive = TRUE)
+    cat(paste("Created directory:", subdirectory_path, "\n"))
+  } else {
+    cat(paste("Directory already exists:", subdirectory_path, "\n"))
+  }
+}
+
+subsubdirectories <- c("outputs/plots", "outputs/tables", "outputs/r_files")
+
+# Check and create subdirectories if they don't exist
+for (subdir in subsubdirectories) {
   
   subdirectory_path <- file.path(paste0(species,'/',subdir))
   
@@ -131,10 +147,8 @@ working_meta4 <- working_meta4 %>%
 
 ##################### write meta file ##################### 
 
-out_meta <- working_meta4[,c(1,16,3:4,16, 2, 5:15, 17:18,20)]
+out_meta <- working_meta4[,c(1,16,3:4, 2, 5:15, 17:18,20)]
 colnames(out_meta)[2] <- "site"
-colnames(out_meta)[5] <- "analysis_by_site"
-
 
 write.xlsx(out_meta, paste0(species, "/meta/", species, "_", dataset, "_meta.xlsx"))
 
