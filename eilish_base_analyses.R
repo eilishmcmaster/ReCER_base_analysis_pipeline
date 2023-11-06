@@ -38,6 +38,7 @@ library("viridis")
 library(diveRsity)
 library(RRtools)
 
+theme_set(theme_few())
 
 maindir <- '/Users/eilishmcmaster/Documents/ReCER_base_analysis_pipeline/'
 
@@ -55,14 +56,9 @@ missingness <- 0.3
 
 species_col_name <- setup_variables[4, 2]
 site_col_name <- setup_variables[5, 2] # this is the equivalent of analysis
+remove_pops_less_than_n5 <- setup_variables[6, 2]
+downsample <- setup_variables[7, 2]
 
-
-#Number of analysis columns in metafile
-Num_analyses <- 3
-#Analysis column in meta file you want to run
-analysis.index <- 1
-#Minimum number of samples to keep a population in analyses
-Minimum_pop <- 5
 #Kinship threshold to considered samples as belonging to a single genet
 Clonal_threshold <- 0.4
 #Number of samples to subsample populations to prior to analyses
@@ -103,33 +99,61 @@ treatment <- dms$treatment
 # get mean values of lat and long per species site 
 
 # # Original Site Summary
-original_site_summary <- dms$meta$analyses %>% as.data.frame()%>%
+unfiltered_site_summary <- dms$meta$analyses %>% as.data.frame()%>%
   group_by(!!sym(species_col_name), !!sym(site_col_name)) %>%
-  summarize(n_original = sum(n()),
+  summarize(n_unfiltered = sum(n()),
             lat = mean(as.numeric(lat), na.rm=TRUE),
             long = mean(as.numeric(long),na.rm=TRUE),
             .groups = 'drop') %>%
-  filter(n_original > 0) %>%
+  filter(n_unfiltered > 0) %>%
   as.data.frame()
 
-divxlims <- c(min(original_site_summary$long, na.rm=TRUE)-0.2,max(original_site_summary$long, na.rm=TRUE)+0.2) #find the min / max longitude
-divylims <- c(min(original_site_summary$lat, na.rm=TRUE)-0.2,max(original_site_summary$lat, na.rm=TRUE)+0.2) #find the min / max latitude
 
-# make dms where there are no n=1 site
-not_n1_sites <- as.vector(original_site_summary[original_site_summary$n_original<=1,2]) #remove groups where n<=1
-not_n1_samples <- dms$sample_names[which(!(dms$meta$analyses[,site_col_name] %in% not_n1_sites))]
-dms_no_n1_sites <- remove.by.list(dms, not_n1_samples)
+####################################### Remove populations with less than five samples ####################################### 
+if(remove_pops_less_than_n5=="TRUE"){
+  not_n5_sites <- as.vector(unfiltered_site_summary[unfiltered_site_summary$n_unfiltered<5,2]) #remove groups where n<=1
+  not_n5_samples <- dms$sample_names[which(!(dms$meta$analyses[,site_col_name] %in% not_n5_sites))]
+  dms <- remove.by.list(dms, not_n5_samples)
+  
+  dms_no_n1_sites <- dms
+}else{
+  # make dms where there are no n=1 site
+  not_n1_sites <- as.vector(unfiltered_site_summary[unfiltered_site_summary$n_unfiltered<=1,2]) #remove groups where n<=1
+  not_n1_samples <- dms$sample_names[which(!(dms$meta$analyses[,site_col_name] %in% not_n1_sites))]
+  dms_no_n1_sites <- remove.by.list(dms, not_n1_samples)
+}
 
-# #######!!!!!!!!!!!!!!!!!!!!!! make conditional 
-# #####Remove populations with less than five samples#####
-# dms <- remove_by_sample_number(dms,analysis.index)
-# 
 # #####Subsamples populations down to a standard number of samples (change value in third line to change target value)######
-# dms <- subsample_sites(dms,analysis,samples_per_pop)
-# #######!!!!!!!!!!!!!!!!!!!!!! make conditional 
+if(downsample=="TRUE"){
+  dms <- subsample_sites(dms,site_col_name,samples_per_pop)
+}
+
+####################################### Summarise samples by site ####################################### 
+
+filtered_site_summary <- dms$meta$analyses %>% as.data.frame()%>%
+  group_by(!!sym(species_col_name), !!sym(site_col_name)) %>%
+  summarize(n_filtered = sum(n())) %>%
+  as.data.frame()
 
 
-#### Colour palettes #### 
+site_samples_summary <- merge(unfiltered_site_summary, filtered_site_summary,
+                              by = c(site_col_name, species_col_name), all.x = TRUE)
+
+
+site_samples_summary <- site_samples_summary[,c(2,1,4,5,3,6)]
+ 
+
+# Calculate total values per unique site_samples_summary[,1] value
+total_summary <- site_samples_summary %>%
+  group_by(!!sym(species_col_name)) %>%
+  summarize(n_unfiltered = sum(n_unfiltered, na.rm=TRUE), n_filtered = sum(n_filtered, na.rm=TRUE))
+
+# Combine the original and total summaries
+final_summary <- bind_rows(site_samples_summary, total_summary)
+write.xlsx(final_summary, paste0(species,"/outputs/tables/sites_sample_summary.xlsx"), asTable = FALSE, overwrite = TRUE)
+
+
+###########################################  Colour palettes ###########################################  
 sp_colours <- named_list_maker(dms$meta$analyses[,species_col_name], "Spectral", 9)
 
 sp_shapes <- 1:length(unique(dms$meta$analyses[,species_col_name]))
@@ -147,7 +171,34 @@ site_shapes <- rep(1:25, length.out = length(unique(dms$meta$analyses[,site_col_
 names(site_shapes) <- unique(dms$meta$analyses[,site_col_name])
 
 site_order <- names(site_colours)
-#### clones ####
+
+site_labels <-   geom_text_repel(data=filtered_site_summary, mapping=aes(x=long, y=lat, label=!!sym(site_col_name)),colour="black",
+                                 size=3, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+
+####################################### MAP ######################################
+
+divxlims <- c(min(filtered_site_summary$long, na.rm=TRUE)-0.2,max(filtered_site_summary$long, na.rm=TRUE)+0.2) #find the min / max longitude
+divylims <- c(min(filtered_site_summary$lat, na.rm=TRUE)-0.2,max(filtered_site_summary$lat, na.rm=TRUE)+0.2) #find the min / max latitude
+
+base_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="grey96", colour="grey28") +
+  coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank())+
+  theme(axis.text.x = element_text(angle=90, size=6),axis.text.y=element_text(size=6), legend.position = "none")+
+  ggsn::scalebar(agg_qdf, dist = round(diff(divxlims)*20,-1), dist_unit = "km", location = "bottomright", 
+                 st.bottom = F, st.size = 2, st.dist = 0.02,border.size =0.5,
+                 transform = TRUE, model = "WGS84", height = 0.01)
+
+
+
+plain_map <- base_map+
+  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, fill=!!sym(site_col_name)), shape=21, size=2)+ 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none")+
+  scale_fill_manual(values=site_colours)+ site_labels
+
+plain_map
+
+
+
+###########################################  clones ########################################### 
 # find and remove clones using SNPrelate kinship 
 
 #calculate kinship by population 
@@ -213,7 +264,7 @@ write.xlsx(clones_out, paste0(species,"/outputs/tables/clones.xlsx"), asTable = 
 #   as.data.frame()
 # 
 # # Merge Site Samples Summary
-# site_samples_summary <- merge(original_site_summary, clones_removed_site_summary,
+# site_samples_summary <- merge(filtered_site_summary, clones_removed_site_summary,
 #                               by = c(site_col_name, species_col_name), all.x = TRUE)
 # 
 # 
@@ -223,7 +274,7 @@ write.xlsx(clones_out, paste0(species,"/outputs/tables/clones.xlsx"), asTable = 
 # # Calculate total values per unique site_samples_summary[,1] value
 # total_summary <- site_samples_summary %>%
 #   group_by(species_col_name) %>%
-#   summarize(n_original = sum(n_original, na.rm=TRUE), n_no_clones = sum(n_no_clones, na.rm=TRUE)) %>%
+#   summarize(n_filtered = sum(n_filtered, na.rm=TRUE), n_no_clones = sum(n_no_clones, na.rm=TRUE)) %>%
 #   mutate(pop_large = "Total") %>%
 #   mutate(pop = "x") %>%
 #   as.data.frame()
@@ -241,7 +292,7 @@ write.xlsx(clones_out, paste0(species,"/outputs/tables/clones.xlsx"), asTable = 
 # write.xlsx(final_summary, paste0(species,"/outputs/sites_sample_summary.xlsx"), asTable = FALSE, overwrite = TRUE)
 
 
-#### kinship heatmap
+###########################################  kinship heatmap ####################################### 
 #### Kinship by distance ####
 
 col_fun2 = colorRamp2(c(0,0.2,0.4), c("white", "red","black"))
@@ -309,28 +360,6 @@ draw(hma)
 dev.off()
 
 
-
-#### diversity stats ####
-
-# site_stats <- species_site_stats(dms, maf=0.05, pop_var="sp", site_var=site_col_name, missing=0.2)
-# big_site_stats <- species_site_stats(dms, maf=0.05, pop_var="sp", site_var="pop_large", missing=0.2)
-# gg_stats <- species_site_stats(dms, 0.05, "sp", "sp",missing=0.2)
-# gg_separate_stats <- multispecies_stats(dms, 0.05, var=dms$meta$analyses[,"sp"], missing=0.2)
-
-# write.xlsx(site_stats[,c(14,1,15,2,4,5,7,13)], file="PherFitz/outputs/20230822_site_stats_0.05.xlsx", rowNames=TRUE)
-# write.xlsx(big_site_stats[,c(14,1,15,2,4,5,7,13)], file="PherFitz/outputs/20230822_pop_large_stats_0.05.xlsx", rowNames=TRUE)
-# write.xlsx(gg_stats[,c(14,1,15,2,4,5,7,13)], file="PherFitz/outputs/20230822_sp_stats_0.05.xlsx", rowNames=TRUE)
-# write.xlsx(gg_separate_stats[,c(13,1,3,4,6,12)], file="PherFitz/outputs/20230822_gg_separate_stats_0.05.xlsx", rowNames=TRUE)
-# 
-# 
-# dms_pf_0.05_miss20 <- remove.poor.quality.snps(dms, min_repro=0.96, max_missing=0.2) %>%
-#   remove.by.maf(., 0.05)
-# 
-# fitz_allele_list <- make_allele_list(dms_pf_0.05_miss20, dms_pf_0.05_miss20$meta$analyses[,"pop_large_short"], min_af = 0)
-# 
-# private_total_alleles <- calculate_private_alleles(fitz_allele_list[c(1:3,5:11)])
-# private_total_alleles
-
 ################################################ PCA ################################################ 
 
 dms_1000 <- remove.loci.randomly(dms, 5000)
@@ -346,19 +375,19 @@ pcnames <- paste0(colnames(g_pca_df)," (",
 
 # species PCA
 pca_plot_pc12_species <- ggplot(g_pca_df2, aes(x=PC1, y=PC2, colour=!!sym(species_col_name)))+ 
-  geom_point()+theme_few()+xlab(pcnames[1])+ylab(pcnames[2])+
+  geom_point()+xlab(pcnames[1])+ylab(pcnames[2])+
   theme(legend.key.size = unit(0, 'lines'),# legend.position = "right",
         legend.text=element_text(face="italic"))+
   scale_colour_manual(values=sp_colours)
 
 ggsave(paste0(species,"/outputs/plots/species_PCA_PC12.png"), plot = pca_plot_pc12_species, width = 20, height = 15, dpi = 600, units = "cm")
 
-# site PCAs
+# site PCAs'
 
 pca_plot_pc12_site <- ggplot(g_pca_df2, 
                              aes(x=PC1, y=PC2,
                                  colour=!!sym(site_col_name)))+ 
-  geom_point()+theme_few()+xlab(pcnames[1])+ylab(pcnames[2])+
+  geom_point()+xlab(pcnames[1])+ylab(pcnames[2])+
   theme(legend.key.size = unit(0, 'lines'))+
   scale_colour_manual(values=site_colours)+
   geom_text_repel(data= g_pca_df2, mapping= aes(x=PC1, y=PC2,label=!!sym(site_col_name)),colour="black",
@@ -367,7 +396,7 @@ pca_plot_pc12_site <- ggplot(g_pca_df2,
 pca_plot_pc23_site <- ggplot(g_pca_df2, 
                              aes(x=PC3, y=PC2,
                                  colour=!!sym(site_col_name)))+ 
-  geom_point()+theme_few()+xlab(pcnames[3])+ylab(pcnames[2])+
+  geom_point()+xlab(pcnames[3])+ylab(pcnames[2])+
   theme(legend.key.size = unit(0, 'lines'))+
   scale_colour_manual(values=site_colours)+
   geom_text_repel(data= g_pca_df2, mapping= aes(x=PC3, y=PC2,label=!!sym(site_col_name)),colour="black",
@@ -376,7 +405,7 @@ pca_plot_pc23_site <- ggplot(g_pca_df2,
 pca_plot_pc34_site <- ggplot(g_pca_df2, 
                              aes(x=PC3, y=PC4,
                                  colour=!!sym(site_col_name)))+ 
-  geom_point()+theme_few()+xlab(pcnames[3])+ylab(pcnames[4])+
+  geom_point()+xlab(pcnames[3])+ylab(pcnames[4])+
   theme(legend.key.size = unit(0, 'lines'))+
   scale_colour_manual(values=site_colours)+
   geom_text_repel(data= g_pca_df2, mapping= aes(x=PC3, y=PC4,label=!!sym(site_col_name)),colour="black",
@@ -393,17 +422,17 @@ ggsave(paste0(species,"/outputs/plots/site_PCA_PC12.png"), plot = pca_plot_pc12_
 
 pca_plot_pc12_lat <- ggplot(g_pca_df2, aes(x=PC1, y=PC2, colour=as.numeric(lat)))+ 
   labs(color="Latitude")+
-  geom_point()+theme_few()+ xlab(pcnames[1])+ylab(pcnames[2])+
+  geom_point()+ xlab(pcnames[1])+ylab(pcnames[2])+
   scale_color_gradient(high = "red",low = "blue", na.value = "grey30")
 
 pca_plot_pc23_lat <- ggplot(g_pca_df2, aes(x=PC3, y=PC2, colour=as.numeric(lat)))+ 
   labs(color="Latitude")+
-  geom_point()+theme_few()+xlab(pcnames[3])+ylab(pcnames[2])+
+  geom_point()+xlab(pcnames[3])+ylab(pcnames[2])+
   scale_color_gradient(high = "red",low = "blue", na.value = "grey30")
 
 pca_plot_pc34_lat <- ggplot(g_pca_df2, aes(x=PC3, y=PC4, colour=as.numeric(lat)))+ 
   labs(color="Latitude")+
-  geom_point()+theme_few()+xlab(pcnames[3])+ylab(pcnames[4])+
+  geom_point()+xlab(pcnames[3])+ylab(pcnames[4])+
   scale_color_gradient(high = "red",low = "blue", na.value = "grey30")
 
 combined_latitude_pca <- ggarrange(pca_plot_pc12_lat, pca_plot_pc23_lat, pca_plot_pc34_lat, ncol=3, common.legend = TRUE, legend="right")
@@ -411,9 +440,8 @@ combined_latitude_pca
 
 ggsave(paste0(species,"/outputs/plots/latitude_PCA_all.png"), plot = combined_latitude_pca, width = 30, height = 10, dpi = 600, units = "cm")
 
-#### FST ####
 
-
+###########################################  FST ########################################### 
 
 # calculate FST and geodist
 gds_file <- dart2gds(dms_no_n1_sites, RandRbase, species, dataset)
@@ -438,15 +466,15 @@ colnames(Fst_sig)[4] <- "Fst"
 Fst_sig$Geo_dist2 <-Fst_sig$Geo_dist/1000 
 
 # adding metadata for sites
-Fst_sig2 <- merge(Fst_sig, distinct(original_site_summary[,c(site_col_name,species_col_name)]), by.x="Var1", by.y=site_col_name, all.y=FALSE)
-Fst_sig2 <- merge(Fst_sig2, distinct(original_site_summary[,c(site_col_name,species_col_name)]), by.x="Var2", by.y=site_col_name, all.y=FALSE)
+Fst_sig2 <- merge(Fst_sig, distinct(filtered_site_summary[,c(site_col_name,species_col_name)]), by.x="Var1", by.y=site_col_name, all.y=FALSE)
+Fst_sig2 <- merge(Fst_sig2, distinct(filtered_site_summary[,c(site_col_name,species_col_name)]), by.x="Var2", by.y=site_col_name, all.y=FALSE)
 Fst_sig2$same_sp <- ifelse(Fst_sig2[,6]== Fst_sig2[,7], paste("Within", species_col_name), paste("Between", species_col_name))
 
 fstp1<- ggplot(Fst_sig2, aes(x= Geo_dist2, y=Fst, color=same_sp))+geom_point(size=1, alpha=0.3)+
   labs(x="Distance (km)", y="FST", colour="Comparison")+
   # facet_zoom(x=Geo_dist2<2, zoom.size=1)+
   geom_hline(yintercept = 0.3, color="black", linetype="dotted")+
-  theme_few()+
+  
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position="bottom")+
   labs(title = paste("Mantel statistic r is", round(man$statistic, 3), ", P =", round(man$signif, 5)))+ theme(plot.title = element_text(size=10))
 
@@ -463,7 +491,7 @@ mat <- geo_d/1000 # convert to km
 
 #FST
 mat2 <-pFst$Fst
-mat2 <- merge(mat2, original_site_summary, by.x=0, by.y=site_col_name, all.y=FALSE) #add aggregated df to mat2 (fst)
+mat2 <- merge(mat2, filtered_site_summary, by.x=0, by.y=site_col_name, all.y=FALSE) #add aggregated df to mat2 (fst)
 rownames(mat2) <- mat2$Row.names
 
 mat2$Row.names <- NULL
@@ -563,7 +591,7 @@ dev.off()
 write.xlsx(list(geo_dist_km=mat, fst=mat2), 
             paste0(species,"/outputs/tables/geodist_FST_by_",site_col_name,".xlsx"),rowNames = TRUE)
 
-#### Visualise splitstree ####
+###########################################  Visualise splitstree ########################################### 
 
 splitstree(dist(dms$gt), paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
 
@@ -635,13 +663,6 @@ splitstree_plot_site
 ggsave(paste0(species,"/outputs/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
 
 
-# map by species
-
-# TO DO 
-# LEA PLOTYS WITH MAPS
-# SITE MAP
-# DIVERSITY STATS
-
 ########################################### LEA ########################################
 kvalrange <- 2:8
 
@@ -662,7 +683,7 @@ snmf_project <- load.snmfProject(lea_project)
 
 ## entropy 
 entropy <- t(summary(snmf_project)$crossEntropy) %>% as.data.frame()
-entropy_plot <- ggplot(entropy, aes(x=kvalrange, y=mean))+geom_point(colour="red")+theme_few()+
+entropy_plot <- ggplot(entropy, aes(x=kvalrange, y=mean))+geom_point(colour="red")+
   labs(x="K", y="Mean ncross entropy")+
   theme(axis.text = element_text(size=6), axis.title = element_text(size=8),
         legend.position="none")
@@ -697,14 +718,11 @@ for (kval in kvalrange){
   agg_qdf <- aggregate(. ~ site, data = qdf4, FUN = mean)
   
   
-  scatter_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="grey96", colour="grey28") +
-  coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank(), fill="Source\npopulation")+
+
+  
+  scatter_map <- base_map+ labs(fill="Source\npopulation")+
   geom_scatterpie(mapping=aes(x=long, y=lat, group =site, r = diff(divxlims)/20),data =agg_qdf,
-                    cols=colnames(agg_qdf)[2:(kval+1)],  alpha=1, size=0.1, colour="black", na.rm=TRUE)+theme_few()+
-    theme_few()+theme(axis.text.x = element_text(angle=90, size=6),axis.text.y=element_text(size=6), legend.position = "none")+
-    ggsn::scalebar(agg_qdf, dist = round(diff(divxlims)*20,-1), dist_unit = "km", location = "bottomright", 
-                   st.bottom = F, st.size = 2, st.dist = 0.02,border.size =0.5,
-                   transform = TRUE, model = "WGS84", height = 0.01)+
+                    cols=colnames(agg_qdf)[2:(kval+1)],  alpha=1, size=0.1, colour="black", na.rm=TRUE)+
     labs(title=paste("K = ",kval))
   
   # make admix plot
@@ -719,7 +737,7 @@ for (kval in kvalrange){
                     aes(x=sample, #, labels=NULL),
                         y=Q, fill=population))+
     geom_bar(position="stack", stat="identity")+
-    theme_few()+
+    
     labs(y="Admixture\ncoefficient (Q)", x=element_blank(), fill="Source\npopulation")+
     facet_grid(~factor(site, levels=site_order), scales = "free_x", space = "free_x")+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size=3),
@@ -784,26 +802,10 @@ for (i in seq(min(kvalrange), length(scatterpie_plots), by = 8)) {
 dev.off()
 
 
-########################################### MAP ########################################
 
-
-plain_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="white", colour="grey28") +theme_few()+
-  coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank())+
-  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, fill=!!sym(site_col_name)), shape=21, size=2)+ #, shape=!!sym(site_col_name)
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none")+
-  scale_fill_manual(values=site_colours)+
-  # scale_shape_manual(values=site_shapes)+
-  geom_text_repel(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, label=!!sym(site_col_name)),colour="black",
-                  size=3, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)+
-  ggsn::scalebar(agg_qdf, dist = round(diff(divxlims)*20,-1), dist_unit = "km", location = "bottomright", 
-                 st.bottom = F, st.size = 3, st.dist = 0.02,border.size =0.5,
-                 transform = TRUE, model = "WGS84", height = 0.01)
-plain_map
-
-
-#######################################DIVERSITY######################################
+####################################### DIVERSITY ######################################
 site_stats <- species_site_stats(dms_1000, maf=0.05, pop_var=species_col_name, site_var=site_col_name, missing=0.2)
-site_stats_merged <- merge(site_stats, original_site_summary[,c(1:2,4:5)], by=site_col_name)
+site_stats_merged <- merge(site_stats, filtered_site_summary[,c(1:2,4:5)], by=site_col_name)
 
 # Find the maximum of the two size variables
 het_range <- range(min(site_stats_merged[,c('obs_het', 'exp_het')]), max(site_stats_merged[,c('obs_het', 'exp_het')]))
@@ -813,45 +815,34 @@ write.xlsx(site_stats_merged,
             paste0(species,"/outputs/tables/statistics_",site_col_name,"_by_",species_col_name,".xlsx"), rowNames = FALSE)
 
 
-ho_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill = "grey96", colour = "grey28") +
-  coord_sf(xlim = divxlims, ylim = divylims) + labs(y = element_blank(), x = element_blank()) +
+ho_map <- base_map + #site_labels+
   geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size = obs_het), alpha = 0.3, color = "red") +
   geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
-  theme_few() +
   theme(legend.position = "bottom", legend.direction = "vertical", 
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
   labs(title = "HO", size="HO")+
-  scale_size_continuous(limits = het_range)+
-  geom_text_repel(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, label=!!sym(site_col_name)),colour="black",
-                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+  scale_size_continuous(limits = het_range)
 
-he_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill = "grey96", colour = "grey28") +
-  coord_sf(xlim = divxlims, ylim = divylims) + labs(y = element_blank(), x = element_blank()) +
+he_map <- base_map + #site_labels+
   geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size =exp_het), alpha = 0.3, color = "red") +
   geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
-  theme_few() +
   theme(legend.position = "bottom", legend.direction = "vertical",
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
   labs(title = "HE", size="HE")+
-  scale_size_continuous(limits = het_range)+
-  geom_text_repel(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, label=!!sym(site_col_name)),colour="black",
-                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+  scale_size_continuous(limits = het_range)
 
-fis_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="grey96", colour="grey28") +
-  coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank())+
+fis_map <- base_map + site_labels+
   geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, color=fis), alpha=0.5)+
-  theme_few()+
+  
   scale_color_gradient2(high = "red",mid="white", midpoint = 0, low = "blue", na.value = "grey30")+
   geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
   theme(legend.position = "bottom", legend.direction = "vertical",
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
-  labs(title="FIS")+
-  geom_text_repel(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, label=!!sym(site_col_name)),colour="black",
-                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
-
+  labs(title="FIS")
 
 
 
 combined_stats_plot <- ( ho_map | he_map | fis_map ) / ncol(3)
 
 
+ggsave(paste0(species,"/outputs/plots/diversity_maps.png"), plot = combined_stats_plot, width = 30, height = 25, dpi = 600, units = "cm")
