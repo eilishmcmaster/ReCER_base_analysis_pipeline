@@ -698,11 +698,11 @@ for (kval in kvalrange){
   
   scatter_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="grey96", colour="grey28") +
   coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank(), fill="Source\npopulation")+
-  geom_scatterpie(mapping=aes(x=long, y=lat, group =site, r = diff(divxlims)/40),data =agg_qdf,
+  geom_scatterpie(mapping=aes(x=long, y=lat, group =site, r = diff(divxlims)/20),data =agg_qdf,
                     cols=colnames(agg_qdf)[2:(kval+1)],  alpha=1, size=0.1, colour="black", na.rm=TRUE)+theme_few()+
     theme_few()+theme(axis.text.x = element_text(angle=90, size=6),axis.text.y=element_text(size=6), legend.position = "none")+
     ggsn::scalebar(agg_qdf, dist = round(diff(divxlims)*20,-1), dist_unit = "km", location = "bottomright", 
-                   st.bottom = F, st.size = 3, st.dist = 0.02,border.size =0.5,
+                   st.bottom = F, st.size = 2, st.dist = 0.02,border.size =0.5,
                    transform = TRUE, model = "WGS84", height = 0.01)+
     labs(title=paste("K = ",kval))
   
@@ -723,15 +723,16 @@ for (kval in kvalrange){
     facet_grid(~factor(site, levels=site_order), scales = "free_x", space = "free_x")+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size=3),
           strip.text.x = element_text(size = 6), strip.background = element_blank(), 
-          axis.title.y = element_text(size=8))+
+          axis.title.y = element_text(size=8),
+          legend.position="none")+
     scale_y_continuous(limits = c(0,1.001), expand=c(0,0))+
     theme(strip.text.x = element_text(angle = 90, size=6), panel.spacing = unit(0.07, "lines"))+
     labs(title=paste("K = ",kval))
   
   
   admix_plot_mini <- ggplot(qdf_long, 
-                       aes(x=sample,
-                           y=Q, fill=population))+
+                       aes(x=Q,
+                           y=sample, fill=population))+
     geom_bar(position="stack", stat="identity", show.legend = FALSE)+
     theme_void()
   
@@ -740,8 +741,8 @@ for (kval in kvalrange){
   admix_bar_plots[[kval]] <- admix_plot
   admix_bar_plots_mini[[kval]] <- admix_plot_mini
   
-  map_mini[[kval]] <- ggarrange(scatter_map+theme(plot.margin = unit(c(0,-1,0,-1), 'lines')),
-                                admix_plot_mini+theme(plot.margin = unit(c(1.2,0,2.2,-1), 'lines')), ncol=2, widths=c(3,2))
+  # map_mini[[kval]] <- ggarrange(scatter_map+theme(plot.margin = unit(c(0,0,0,0), 'lines')),
+  #                               admix_plot_mini+theme(plot.margin = unit(c(0,0,0,0), 'lines')), align="hv", ncol=2, widths=c(3,2))
 }
 
 
@@ -757,41 +758,53 @@ admix_plots_to_arrange <- lapply(kvalrange, function(i) admix_bar_plots[[i]])
 #                                   legend= "none")
 
 
-max_plots_per_page <- 4
-
 # Create a PDF file to save the plots
-pdf(paste0(species,"/outputs/plots/admix_barplots.pdf"),width = 12, height = 12)
-
+max_plots_per_page <- 5
+pdf(paste0(species,"/outputs/plots/admix_barplots.pdf"),width = 8.3, height = 11.7)
 # Loop through the list of ggplots and print them to the PDF
 for (i in seq(min(kvalrange), length(admix_bar_plots), by = max_plots_per_page)) {
   end <- min(i + max_plots_per_page - 1, length(admix_bar_plots))
   plots_to_print <- admix_bar_plots[i:end]
-  grid.arrange(grobs = plots_to_print, ncol = 1, nrow=4)
+  grid.arrange(grobs = plots_to_print, ncol = 1, nrow=5)
 }
-
-# Close the PDF file
 dev.off()
 
 # Create a PDF file to save the plots
-pdf(paste0(species,"/outputs/plots/admix_map.pdf"),width = 12, height = 12)
+pdf(paste0(species,"/outputs/plots/scatterpie_map.pdf"),width = 11.7, height = 8.3)
 
 # Loop through the list of ggplots and print them to the PDF
-for (i in seq(min(kvalrange), length(map_mini), by = 8)) {
-  end <- min(i + 8 - 1, length(map_mini))
-  plots_to_print <- map_mini[i:end]
-  grid.arrange(grobs = plots_to_print, ncol = 2, nrow=4)
+for (i in seq(min(kvalrange), length(scatterpie_plots), by = 8)) {
+  end <- min(i + 8 - 1, length(scatterpie_plots))
+  plots_to_print <- scatterpie_plots[i:end]
+  grid.arrange(grobs = plots_to_print, ncol = 4, nrow=2)
 }
 
 # Close the PDF file
 dev.off()
 
+max_plots_per_page <- 8  # Increased to accommodate the entropy_plot
+pdf(paste0(species,"/outputs/plots/scatterpie_map.pdf"), width = 8.3, height = 11.7)
 
-map_mini_to_arrange <- lapply(kvalrange, function(i) map_mini[[i]])
-# Arrange the plots using ggarrange
-arranged_map_mini_plots <- ggarrange(plotlist = map_mini_to_arrange, ncol = 3, nrow = 2)
+# Initialize the plots list with the entropy_plot as the first element
+plots_to_print <- list(entropy_plot)
+
+# Add the admix_bar_plots to the list
+plots_to_print <- c(plots_to_print, scatterpie_plots)
+
+# Loop through the list of ggplots and print them to the PDF
+for (i in seq(1, length(plots_to_print), by = max_plots_per_page)) {
+  end <- min(i + max_plots_per_page - 1, length(plots_to_print))
+  plots_subset <- plots_to_print[i:end]
+  grid.arrange(grobs = plots_subset, ncol = 4, nrow = 2)
+}
+dev.off()
 
 
+mini_admix_plots_to_arrange <- lapply(kvalrange, function(i) admix_bar_plots_mini[[i]])
+mini_arranged_admix_plots <- ggarrange(plotlist = mini_admix_plots_to_arrange, ncol = 1, nrow = 8, common.legend = TRUE,
+                                  legend= "none")
 
+mini_arranged_admix_plots
 ########################################### MAP ########################################
 
 
