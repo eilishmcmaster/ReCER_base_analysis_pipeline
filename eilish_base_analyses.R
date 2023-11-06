@@ -1,3 +1,4 @@
+library(patchwork)
 library(gridExtra)
 library(RColorBrewer)
 library(circlize) 
@@ -142,9 +143,8 @@ site_categories <- site_categories[order(as.numeric(site_categories))]
 site_colours <- named_list_maker(site_categories, "Set3", 12)
 site_colours <- c(site_colours, "no_geo_data"="grey30")
 
-site_shapes <- 1:length(site_categories)
-names(site_shapes) <- site_categories
-site_shapes <- c(site_shapes, "no_geo_data"="grey30")
+site_shapes <- rep(1:25, length.out = length(unique(dms$meta$analyses[,site_col_name])))
+names(site_shapes) <- unique(dms$meta$analyses[,site_col_name])
 
 site_order <- names(site_colours)
 #### clones ####
@@ -710,11 +710,11 @@ for (kval in kvalrange){
   # make admix plot
   qdf_long <- pivot_longer(qdf3, cols=2:(kval+1), names_to="population", values_to="Q") 
   
-  # Order the data frame based on the index
-  qdf_long <- qdf_long[order(match(qdf_long$site, site_order)), ]
-  qdf_long$sample <- factor(qdf_long$sample, levels = unique(qdf_long$sample))
-  
-  
+  # # Order the data frame based on the index
+  # qdf_long <- qdf_long[order(match(qdf_long$site, site_order)), ]
+  # qdf_long$sample <- factor(qdf_long$sample, levels = unique(qdf_long$sample))
+  # 
+  # 
   admix_plot <- ggplot(qdf_long, 
                     aes(x=sample, #, labels=NULL),
                         y=Q, fill=population))+
@@ -783,39 +783,75 @@ for (i in seq(min(kvalrange), length(scatterpie_plots), by = 8)) {
 # Close the PDF file
 dev.off()
 
-max_plots_per_page <- 8  # Increased to accommodate the entropy_plot
-pdf(paste0(species,"/outputs/plots/scatterpie_map.pdf"), width = 8.3, height = 11.7)
 
-# Initialize the plots list with the entropy_plot as the first element
-plots_to_print <- list(entropy_plot)
-
-# Add the admix_bar_plots to the list
-plots_to_print <- c(plots_to_print, scatterpie_plots)
-
-# Loop through the list of ggplots and print them to the PDF
-for (i in seq(1, length(plots_to_print), by = max_plots_per_page)) {
-  end <- min(i + max_plots_per_page - 1, length(plots_to_print))
-  plots_subset <- plots_to_print[i:end]
-  grid.arrange(grobs = plots_subset, ncol = 4, nrow = 2)
-}
-dev.off()
-
-
-mini_admix_plots_to_arrange <- lapply(kvalrange, function(i) admix_bar_plots_mini[[i]])
-mini_arranged_admix_plots <- ggarrange(plotlist = mini_admix_plots_to_arrange, ncol = 1, nrow = 8, common.legend = TRUE,
-                                  legend= "none")
-
-mini_arranged_admix_plots
 ########################################### MAP ########################################
 
 
+plain_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="white", colour="grey28") +theme_few()+
+  coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank())+
+  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, fill=!!sym(site_col_name)), shape=21, size=2)+ #, shape=!!sym(site_col_name)
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none")+
+  scale_fill_manual(values=site_colours)+
+  # scale_shape_manual(values=site_shapes)+
+  geom_text_repel(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, label=!!sym(site_col_name)),colour="black",
+                  size=3, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)+
+  ggsn::scalebar(agg_qdf, dist = round(diff(divxlims)*20,-1), dist_unit = "km", location = "bottomright", 
+                 st.bottom = F, st.size = 3, st.dist = 0.02,border.size =0.5,
+                 transform = TRUE, model = "WGS84", height = 0.01)
+plain_map
+
 
 #######################################DIVERSITY######################################
+site_stats <- species_site_stats(dms_1000, maf=0.05, pop_var=species_col_name, site_var=site_col_name, missing=0.2)
+site_stats_merged <- merge(site_stats, original_site_summary[,c(1:2,4:5)], by=site_col_name)
 
-gp   <- dart2genepop(dms, RandRbase, species, dataset, dms$meta$analyses[,analysis],maf_val=0.01)
+# Find the maximum of the two size variables
+het_range <- range(min(site_stats_merged[,c('obs_het', 'exp_het')]), max(site_stats_merged[,c('obs_het', 'exp_het')]))
 
-bs <- basicStats(infile = gp, outfile = NULL,
-                 fis_ci = FALSE, ar_ci = TRUE,
-                 ar_boots = 999,
-                 rarefaction = FALSE, ar_alpha = 0.05)
-diversity_plots(bs)
+
+write.xlsx(site_stats_merged, 
+            paste0(species,"/outputs/tables/statistics_",site_col_name,"_by_",species_col_name,".xlsx"), rowNames = FALSE)
+
+
+ho_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill = "grey96", colour = "grey28") +
+  coord_sf(xlim = divxlims, ylim = divylims) + labs(y = element_blank(), x = element_blank()) +
+  geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size = obs_het), alpha = 0.3, color = "red") +
+  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
+  theme_few() +
+  theme(legend.position = "bottom", legend.direction = "vertical", 
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  labs(title = "HO", size="HO")+
+  scale_size_continuous(limits = het_range)+
+  geom_text_repel(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, label=!!sym(site_col_name)),colour="black",
+                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+
+he_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill = "grey96", colour = "grey28") +
+  coord_sf(xlim = divxlims, ylim = divylims) + labs(y = element_blank(), x = element_blank()) +
+  geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size =exp_het), alpha = 0.3, color = "red") +
+  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
+  theme_few() +
+  theme(legend.position = "bottom", legend.direction = "vertical",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  labs(title = "HE", size="HE")+
+  scale_size_continuous(limits = het_range)+
+  geom_text_repel(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, label=!!sym(site_col_name)),colour="black",
+                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+
+fis_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="grey96", colour="grey28") +
+  coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank())+
+  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, color=fis), alpha=0.5)+
+  theme_few()+
+  scale_color_gradient2(high = "red",mid="white", midpoint = 0, low = "blue", na.value = "grey30")+
+  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
+  theme(legend.position = "bottom", legend.direction = "vertical",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
+  labs(title="FIS")+
+  geom_text_repel(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, label=!!sym(site_col_name)),colour="black",
+                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+
+
+
+
+combined_stats_plot <- ( ho_map | he_map | fis_map ) / ncol(3)
+
+
