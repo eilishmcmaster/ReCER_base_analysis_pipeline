@@ -53,6 +53,8 @@ raw_meta_path <- setup_variables[3, 2]
 topskip   <- 6
 nmetavar  <- 18
 missingness <- 0.3
+maf_val <- 0.05
+
 
 species_col_name <- setup_variables[4, 2]
 site_col_name <- setup_variables[5, 2] # this is the equivalent of analysis
@@ -152,7 +154,8 @@ total_summary <- site_samples_summary %>%
 
 # Combine the original and total summaries
 final_summary <- bind_rows(site_samples_summary, total_summary)
-write.xlsx(final_summary, paste0(species,"/outputs/tables/sites_sample_summary.xlsx"), asTable = FALSE, overwrite = TRUE)
+
+write.xlsx(final_summary, paste0(species,"/outputs/tables/SUMMARY_",site_col_name,"_sample_numbers.xlsx"), asTable = FALSE, overwrite = TRUE)
 
 
 ###########################################  Colour palettes ###########################################  
@@ -174,27 +177,29 @@ names(site_shapes) <- unique(dms$meta$analyses[,site_col_name])
 
 site_order <- names(site_colours)
 
-site_labels <-   geom_text_repel(data=filtered_site_summary, mapping=aes(x=long, y=lat, label=!!sym(site_col_name)),colour="black",
+site_labels <-   geom_text_repel(data=final_summary[!is.na(final_summary$long)&!is.na(final_summary$n_filtered),],
+                                 mapping=aes(x=long, y=lat, label=!!sym(site_col_name)),colour="black",
                                  size=3, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
 
 ####################################### MAP ######################################
 
-divxlims <- c(min(filtered_site_summary$long, na.rm=TRUE)-0.2,max(filtered_site_summary$long, na.rm=TRUE)+0.2) #find the min / max longitude
-divylims <- c(min(filtered_site_summary$lat, na.rm=TRUE)-0.2,max(filtered_site_summary$lat, na.rm=TRUE)+0.2) #find the min / max latitude
+divxlims <- c(min(final_summary$long, na.rm=TRUE)-0.2,max(final_summary$long, na.rm=TRUE)+0.2) #find the min / max longitude
+divylims <- c(min(final_summary$lat, na.rm=TRUE)-0.2,max(final_summary$lat, na.rm=TRUE)+0.2) #find the min / max latitude
 
 base_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="grey96", colour="grey28") +
   coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank())+
   theme(axis.text.x = element_text(angle=90, size=6),axis.text.y=element_text(size=6), legend.position = "none")+
-  ggsn::scalebar(agg_qdf, dist = round(diff(divxlims)*20,-1), dist_unit = "km", location = "bottomright", 
+  ggsn::scalebar(final_summary[!is.na(final_summary$long)&!is.na(final_summary$n_filtered),], dist = round(diff(divxlims)*20,-1), dist_unit = "km", location = "bottomright", 
                  st.bottom = F, st.size = 2, st.dist = 0.02,border.size =0.5,
                  transform = TRUE, model = "WGS84", height = 0.01)
 
 
 
 plain_map <- base_map+
-  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, fill=!!sym(site_col_name)), shape=21, size=2)+ 
+  geom_point(data=final_summary[!is.na(final_summary$long)&!is.na(final_summary$n_filtered),],
+             mapping=aes(x=long, y=lat, fill=!!sym(site_col_name)), shape=21, size=2)+ 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none")+
-  scale_fill_manual(values=site_colours)+ site_labels
+  scale_fill_manual(values=site_colours) + site_labels
 
 plain_map
 
@@ -232,9 +237,8 @@ clones_out <- clones_out[order(as.numeric(clones_out$genet)),] #order the table 
 clones_out$genet <- as.numeric(clones_out$genet)
 
 # Export data if you want 
-# write.table(clones_out, paste0(species,"/outputs/clones_out.tsv"), sep="\t", row.names=FALSE, col.names=TRUE)
-clones_out
-write.xlsx(clones_out, paste0(species,"/outputs/tables/clones.xlsx"), asTable = FALSE, overwrite = TRUE)
+
+write.xlsx(clones_out, paste0(species,"/outputs/tables/PLINK_clones.xlsx"), asTable = FALSE, overwrite = TRUE)
 
 # 
 # # Remove duplicate clones from working data
@@ -364,7 +368,7 @@ dev.off()
 
 ################################################ PCA ################################################ 
 
-dms_1000 <- remove.loci.randomly(dms, 5000)
+dms_1000 <- remove.loci.randomly(dms, 100)
 gen_d5 <- new("genlight", dms_1000[["gt"]]) #convert df to genlight object for glPca function
 gen_pca <- glPca(gen_d5, parallel=TRUE, nf=5) #do pca -- this method allows the input to have NAs 
 g_pca_df <- gen_pca[["scores"]] #extract PCs 
@@ -382,7 +386,7 @@ pca_plot_pc12_species <- ggplot(g_pca_df2, aes(x=PC1, y=PC2, colour=!!sym(specie
         legend.text=element_text(face="italic"))+
   scale_colour_manual(values=sp_colours)
 
-ggsave(paste0(species,"/outputs/plots/species_PCA_PC12.png"), plot = pca_plot_pc12_species, width = 20, height = 15, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs/plots/PCA_",species_col_name,"_PC12.png"), plot = pca_plot_pc12_species, width = 20, height = 15, dpi = 600, units = "cm")
 
 # site PCAs'
 
@@ -417,8 +421,8 @@ pca_plot_pc34_site <- ggplot(g_pca_df2,
 combined_site_pca <- ggarrange(pca_plot_pc12_site, pca_plot_pc23_site, pca_plot_pc34_site, ncol=3, common.legend = TRUE, legend="right")
 # combined_site_pca
 
-ggsave(paste0(species,"/outputs/plots/site_PCA_all.png"), plot = combined_site_pca, width = 30, height = 10, dpi = 600, units = "cm")
-ggsave(paste0(species,"/outputs/plots/site_PCA_PC12.png"), plot = pca_plot_pc12_site, width = 20, height = 15, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs/plots/PCA",site_col_name,"_all.png"), plot = combined_site_pca, width = 30, height = 10, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs/plots/PCA",site_col_name,"_PC12.png"), plot = pca_plot_pc12_site, width = 20, height = 15, dpi = 600, units = "cm")
 
 # latitude PCAs
 
@@ -440,14 +444,14 @@ pca_plot_pc34_lat <- ggplot(g_pca_df2, aes(x=PC3, y=PC4, colour=as.numeric(lat))
 combined_latitude_pca <- ggarrange(pca_plot_pc12_lat, pca_plot_pc23_lat, pca_plot_pc34_lat, ncol=3, common.legend = TRUE, legend="right")
 combined_latitude_pca
 
-ggsave(paste0(species,"/outputs/plots/latitude_PCA_all.png"), plot = combined_latitude_pca, width = 30, height = 10, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs/plots/PCA_latitude_all.png"), plot = combined_latitude_pca, width = 30, height = 10, dpi = 600, units = "cm")
 
 
 ###########################################  FST ########################################### 
 
 # calculate FST and geodist
 gds_file <- dart2gds(dms_no_n1_sites, RandRbase, species, dataset)
-pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=0.05, miss_val=0.2) #calculates genetic distance 
+pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=maf_val, miss_val=0.2) #calculates genetic distance 
 pS        <- population.pw.spatial.dist(dms_no_n1_sites, dms_no_n1_sites$meta$site) #calculates geographic distance between populations
 
 
@@ -482,7 +486,7 @@ fstp1<- ggplot(Fst_sig2, aes(x= Geo_dist2, y=Fst, color=same_sp))+geom_point(siz
 
 fstp1
 
-ggsave(paste0(species,"/outputs/plots/manning_fst.png"),
+ggsave(paste0(species,"/outputs/plots/FST_manning.png"),
        fstp1, width = 15, height = 10, units = "cm", dpi=600)
 
 
@@ -491,9 +495,11 @@ ggsave(paste0(species,"/outputs/plots/manning_fst.png"),
 geo_d <-pS$S #this is a square matrix
 mat <- geo_d/1000 # convert to km 
 
+
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #FST
 mat2 <-pFst$Fst
-mat2 <- merge(mat2, filtered_site_summary, by.x=0, by.y=site_col_name, all.y=FALSE) #add aggregated df to mat2 (fst)
+mat2 <- merge(mat2, filtered_site_summary[,1:2], by.x=0, by.y=site_col_name, all.y=FALSE) #add aggregated df to mat2 (fst)
 rownames(mat2) <- mat2$Row.names
 
 mat2$Row.names <- NULL
@@ -505,7 +511,7 @@ order_hm <- Heatmap(mat,
 od <- colnames(mat)[column_order(order_hm)]
 
 mat = mat[od, od]
-mat2 = mat2[od, c(od,site_col_name)]
+mat2 = mat2[od, c(od,species_col_name)]
 
 # specify fst heatmap colours 
 gene_col <-  colorRamp2(c(0,0.5,1), c("#8DD3C7", "white", "#FB8072"))
@@ -576,7 +582,7 @@ gene_width <- nrow(mat2)*unit(4, "mm")
 draw(geo + gene, ht_gap = -gene_width)
 
 # Set the file name and parameters
-filename <- paste0(species, "/outputs/plots/fst_plot_overlay.pdf")
+filename <- paste0(species, "/outputs/plots/FST_heatmap.pdf")
 width <- (((nrow(mat2)*4)/10) +8)*0.394
 height <- (((nrow(mat2)*4)/10)+5)*0.394
 
@@ -591,85 +597,87 @@ dev.off()
 
 
 write.xlsx(list(geo_dist_km=mat, fst=mat2), 
-            paste0(species,"/outputs/tables/geodist_FST_by_",site_col_name,".xlsx"),rowNames = TRUE)
+            paste0(species,"/outputs/tables/FST_GEODIST_by_",site_col_name,".xlsx"),rowNames = TRUE)
 
 ###########################################  Visualise splitstree ########################################### 
-
-splitstree(dist(dms$gt), paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
-
-#need to open and save the file in Splitstree app for it to open here, IDK why
-Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
-
-x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
-                sample=rep(NA, nrow(Nnet$.plot$vertices)))
-
-x[Nnet$translate$node,"sample"] <- Nnet$translate$label
-x <- merge(x, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
-
-net_x_axis <- max(x$x)-min(x$x)
-net_y_axis <- max(x$y)-min(x$y)
-
-Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .[1:length(Nnet$tip.label)]
-
-
-
-splitstree_plot_species <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
-                          as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
-                          ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
-                          ndigits = NULL)+
-  geom_splitnet(layout = "slanted", size=0.2)+
-  geom_point(data=x, aes(x, y, colour=!!sym(species_col_name)))+
-  scale_colour_manual(values=sp_colours, na.translate=FALSE,
-                      guide = guide_legend(species_col_name))+
-  # geom_tiplab2(size=2, hjust=-0.2)+
-  theme_void()+
-  expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
-                y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
-  theme(legend.text = element_text(face="italic"), legend.position = "top")+coord_fixed()
-
-splitstree_plot_species
+# 
+# splitstree(dist(dms$gt), paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
+# 
+# #need to open and save the file in Splitstree app for it to open here, IDK why
+# Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
+# 
+# x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
+#                 sample=rep(NA, nrow(Nnet$.plot$vertices)))
+# 
+# x[Nnet$translate$node,"sample"] <- Nnet$translate$label
+# x <- merge(x, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
+# 
+# net_x_axis <- max(x$x)-min(x$x)
+# net_y_axis <- max(x$y)-min(x$y)
+# 
+# Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .[1:length(Nnet$tip.label)]
+# 
+# 
+# 
+# splitstree_plot_species <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
+#                           as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
+#                           ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
+#                           ndigits = NULL)+
+#   geom_splitnet(layout = "slanted", size=0.2)+
+#   geom_point(data=x, aes(x, y, colour=!!sym(species_col_name)))+
+#   scale_colour_manual(values=sp_colours, na.translate=FALSE,
+#                       guide = guide_legend(species_col_name))+
+#   # geom_tiplab2(size=2, hjust=-0.2)+
+#   theme_void()+
+#   expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
+#                 y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
+#   theme(legend.text = element_text(face="italic"), legend.position = "top")+coord_fixed()
+# 
+# splitstree_plot_species
 
 ## site splitstree
-Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
-
-x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
-                sample=rep(NA, nrow(Nnet$.plot$vertices)))
-
-x[Nnet$translate$node,"sample"] <- Nnet$translate$label
-x <- merge(x, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
-
-net_x_axis <- max(x$x)-min(x$x)
-net_y_axis <- max(x$y)-min(x$y)
-
-Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .[1:length(Nnet$tip.label)]
-
-
-
-splitstree_plot_site <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
-                                  as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
-                                  ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
-                                  ndigits = NULL)+
-  geom_splitnet(layout = "slanted", size=0.2)+
-  geom_point(data=x, aes(x, y, colour=!!sym(site_col_name)))+
-  scale_colour_manual(values=site_colours, na.translate=FALSE,
-                      guide = guide_legend(site_col_name))+
-  geom_tiplab2(size=2, hjust=-3)+
-  theme_void()+
-  expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
-                y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
-  theme(legend.text = element_text(face="italic"), legend.position = "none")+coord_fixed()
-
-splitstree_plot_site
-
-
-ggsave(paste0(species,"/outputs/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
-
+# Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
+# 
+# x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
+#                 sample=rep(NA, nrow(Nnet$.plot$vertices)))
+# 
+# x[Nnet$translate$node,"sample"] <- Nnet$translate$label
+# x <- merge(x, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
+# 
+# net_x_axis <- max(x$x)-min(x$x)
+# net_y_axis <- max(x$y)-min(x$y)
+# 
+# Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .[1:length(Nnet$tip.label)]
+# 
+# 
+# 
+# splitstree_plot_site <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
+#                                   as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
+#                                   ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
+#                                   ndigits = NULL)+
+#   geom_splitnet(layout = "slanted", size=0.2)+
+#   geom_point(data=x, aes(x, y, colour=!!sym(site_col_name)))+
+#   scale_colour_manual(values=site_colours, na.translate=FALSE,
+#                       guide = guide_legend(site_col_name))+
+#   geom_tiplab2(size=2, hjust=-3)+
+#   theme_void()+
+#   expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
+#                 y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
+#   theme(legend.text = element_text(face="italic"), legend.position = "none")+coord_fixed()
+# 
+# splitstree_plot_site
+# 
+# 
+# ggsave(paste0(species,"/outputs/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
+# 
 
 ########################################### LEA ########################################
-kvalrange <- 2:8
+kvalrange <- 2:7
 
 ##check for LEA FOLDER
 lea_project <- paste0(maindir,RandRbase,species,"/popgen/",treatment,"/lea/",species,"_",dataset,".snmfProject")
+
+# file.remove(list.files(paste0(maindir,RandRbase,species,"/popgen/",treatment,"/lea"), full.names = TRUE))
 
 if(!file.exists(lea_project)){
   nd_lea <- dart2lea(dms_no_n1_sites, RandRbase, species, dataset)
@@ -719,9 +727,6 @@ for (kval in kvalrange){
   
   agg_qdf <- aggregate(. ~ site, data = qdf4, FUN = mean)
   
-  
-
-  
   scatter_map <- base_map+ labs(fill="Source\npopulation")+
   geom_scatterpie(mapping=aes(x=long, y=lat, group =site, r = diff(divxlims)/20),data =agg_qdf,
                     cols=colnames(agg_qdf)[2:(kval+1)],  alpha=1, size=0.1, colour="black", na.rm=TRUE)+
@@ -739,7 +744,6 @@ for (kval in kvalrange){
                     aes(x=sample, #, labels=NULL),
                         y=Q, fill=population))+
     geom_bar(position="stack", stat="identity")+
-    
     labs(y="Admixture\ncoefficient (Q)", x=element_blank(), fill="Source\npopulation")+
     facet_grid(~factor(site, levels=site_order), scales = "free_x", space = "free_x")+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size=3),
@@ -770,9 +774,16 @@ for (kval in kvalrange){
 # Extract the plots based on the indices
 scatterpie_plots_to_arrange <- lapply(kvalrange, function(i) scatterpie_plots[[i]])
 # Arrange the plots using ggarrange
-arranged_scatterpie_plots <- ggarrange(plotlist = scatterpie_plots_to_arrange, ncol = 4, nrow = 2)
+arranged_scatterpie_plots <- ggarrange(plotlist = scatterpie_plots_to_arrange, ncol = 3, nrow = 2)
 arranged_scatterpie_plots
 
+plot_list <- scatterpie_plots
+# Arrange and plot ggplots corresponding to kvals 2:8
+arranged_plots <- plot_list[kvalrange]  # Subtract 1 because indexing is 0-based
+arranged_plots <- wrap_plots(arranged_plots, ncol = 3, nrow=2)  # Change the number of columns as desired
+
+# Display the arranged plots
+arranged_plots
 
 admix_plots_to_arrange <- lapply(kvalrange, function(i) admix_bar_plots[[i]])
 # arranged_admix_plots <- ggarrange(plotlist = admix_plots_to_arrange, ncol = 1, nrow = 8, common.legend = TRUE, 
@@ -781,7 +792,7 @@ admix_plots_to_arrange <- lapply(kvalrange, function(i) admix_bar_plots[[i]])
 
 # Create a PDF file to save the plots
 max_plots_per_page <- 5
-pdf(paste0(species,"/outputs/plots/admix_barplots.pdf"),width = 8.3, height = 11.7)
+pdf(paste0(species,"/outputs/plots/LEA_barplots.pdf"),width = 8.3, height = 11.7)
 # Loop through the list of ggplots and print them to the PDF
 for (i in seq(min(kvalrange), length(admix_bar_plots), by = max_plots_per_page)) {
   end <- min(i + max_plots_per_page - 1, length(admix_bar_plots))
@@ -791,7 +802,7 @@ for (i in seq(min(kvalrange), length(admix_bar_plots), by = max_plots_per_page))
 dev.off()
 
 # Create a PDF file to save the plots
-pdf(paste0(species,"/outputs/plots/scatterpie_map.pdf"),width = 8, height = 8.3)
+pdf(paste0(species,"/outputs/plots/LEA_scatterpie_map.pdf"),width = 8, height = 8.3)
 
 # Loop through the list of ggplots and print them to the PDF
 for (i in seq(min(kvalrange), length(scatterpie_plots), by = 8)) {
@@ -807,14 +818,14 @@ dev.off()
 
 ####################################### DIVERSITY ######################################
 site_stats <- species_site_stats(dms_1000, maf=0.05, pop_var=species_col_name, site_var=site_col_name, missing=0.2)
-site_stats_merged <- merge(site_stats, filtered_site_summary[,c(1:2,4:5)], by=site_col_name)
+site_stats_merged <- merge(site_stats, final_summary[,c(1:4)], by=site_col_name)
 
 # Find the maximum of the two size variables
 het_range <- range(min(site_stats_merged[,c('obs_het', 'exp_het')]), max(site_stats_merged[,c('obs_het', 'exp_het')]))
 
 
 write.xlsx(site_stats_merged, 
-            paste0(species,"/outputs/tables/statistics_",site_col_name,"_by_",species_col_name,".xlsx"), rowNames = FALSE)
+            paste0(species,"/outputs/tables/DIVERSITY_",site_col_name,"_by_",species_col_name,".xlsx"), rowNames = FALSE)
 
 
 ho_map <- base_map + #site_labels+
@@ -847,4 +858,79 @@ fis_map <- base_map + site_labels+
 combined_stats_plot <- ( ho_map | he_map | fis_map ) / ncol(3)
 
 
-ggsave(paste0(species,"/outputs/plots/diversity_maps.png"), plot = combined_stats_plot, width = 30, height = 25, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs/plots/DIVERSITY_maps.png"), plot = combined_stats_plot, width = 30, height = 25, dpi = 600, units = "cm")
+
+######################## text 
+# "Species"
+# Dataset 
+# Raw SNPs
+# Filtered SNPs
+# Prefilter samples
+# Postfilter samples
+####################
+
+
+allele_frequency <- calculate.AF.summary(dms)
+ind_small_maf <- which((allele_frequency$P < maf_val) | allele_frequency$P > (1 - maf_val))
+maf_s <- length(ind_small_maf)
+
+dat <- data.frame("species" = as.character(species), "dataset" = as.character(dataset),
+                  "d1_nloci" = ncol(d1$gt), "dms_nloci" = ncol(dms$gt),
+                  "d1_nsamples" = nrow(d1$gt), "dms_nsamples" = nrow(dms$gt),
+                  "maf" = maf_s)
+
+missing_gt <- is.na(dms$gt)
+count_of_missing_by_locus <- rowSums(missing_gt)
+count_of_missing_by_sample <- colSums(missing_gt)
+
+num_samples <- length(dms$sample_names)
+num_loci <- length(dms$gt)
+
+tiff(file = paste0(species,"/outputs/plots/QC_reportqc.tiff"), width = 8, units = "in", height = 3, res = 300)
+par(mfrow = c(1, 3))
+hist(count_of_missing_by_sample / num_samples, xlab = "proportion of samples that are missing", ylab = "frequency", main = "")
+hist(count_of_missing_by_locus / num_loci, 200, xlab = "proportion of loci that are missing", ylab = "frequency", main = "")
+AF.summary <- calculate.AF.summary(dms)  # HW summary
+plot(AF.summary$P, AF.summary$H, xlab = "Allele Frequency", ylab = "Heterozygosity", main = "")
+dev.off()
+
+wrap_sentence <- function(string, width) {
+  words <- unlist(strsplit(string, " "))
+  fullsentence <- ""
+  checklen <- ""
+  for (i in 1:length(words)) {
+    checklen <- paste(checklen, words[i])
+    if (nchar(checklen) > (width + 1)) {
+      fullsentence <- paste0(fullsentence, "\n")
+      checklen <- ""
+    }
+    fullsentence <- paste(fullsentence, words[i])
+  }
+  fullsentence <- sub("^\\s", "", fullsentence)
+  fullsentence <- gsub("\n ", "\n", fullsentence)
+  return(fullsentence)
+}
+
+species_line <- paste("Species: ", species, ", Dataset:", dataset, sep = "")
+pfsnps_line <- paste("Number of raw SNPs: ", length(d1$locus_names), sep = "")
+snps_line <- paste("Number of quality SNPs (0.2 missing threshold): ", length(dms$locus_names), sep = "")
+pfsamples_line <- paste("Number of prefilter samples: ", length(d1$sample_names), sep = "")
+samples_line <- paste("Number of quality samples: ", length(dms$sample_names), sep = "")
+clones_line <- paste("Number of unique genets (not filtered): ", length(unique(clones_out$genet)), sep = "")
+
+report <- paste(species_line,
+                pfsnps_line,
+                wrap_sentence(snps_line, 38),
+                pfsamples_line,
+                samples_line,
+                clones_line,
+                sep = "\n")
+
+tiff(paste0(species,"/outputs/plots/UQ_tableQCstats.tiff"), units = "in", width = 5, height = 2.3, res = 480)
+par(mar = c(0, 0, 0, 0), mai = c(0, 0, 0, 0))
+plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+text(x = 0.5, y = 0.4, report, cex = 1.1, col = "black", pos = 4, offset = -10)
+dev.off()
+
+
+
