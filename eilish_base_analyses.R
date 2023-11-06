@@ -663,9 +663,10 @@ snmf_project <- load.snmfProject(lea_project)
 ## entropy 
 entropy <- t(summary(snmf_project)$crossEntropy) %>% as.data.frame()
 entropy_plot <- ggplot(entropy, aes(x=kvalrange, y=mean))+geom_point(colour="red")+theme_few()+
-  labs(x="K", y="Mean\ncross entropy")
+  labs(x="K", y="Mean ncross entropy")+
+  theme(axis.text = element_text(size=6), axis.title = element_text(size=8),
+        legend.position="none")
 
-entropy_plot
 
 scatterpie_plots <- list()
 admix_bar_plots <- list()
@@ -749,8 +750,8 @@ for (kval in kvalrange){
 # Extract the plots based on the indices
 scatterpie_plots_to_arrange <- lapply(kvalrange, function(i) scatterpie_plots[[i]])
 # Arrange the plots using ggarrange
-# arranged_scatterpie_plots <- ggarrange(plotlist = scatterpie_plots_to_arrange, ncol = 3, nrow = 2)
-
+arranged_scatterpie_plots <- ggarrange(plotlist = scatterpie_plots_to_arrange, ncol = 4, nrow = 2)
+arranged_scatterpie_plots
 
 
 admix_plots_to_arrange <- lapply(kvalrange, function(i) admix_bar_plots[[i]])
@@ -770,7 +771,7 @@ for (i in seq(min(kvalrange), length(admix_bar_plots), by = max_plots_per_page))
 dev.off()
 
 # Create a PDF file to save the plots
-pdf(paste0(species,"/outputs/plots/scatterpie_map.pdf"),width = 11.7, height = 8.3)
+pdf(paste0(species,"/outputs/plots/scatterpie_map.pdf"),width = 8, height = 8.3)
 
 # Loop through the list of ggplots and print them to the PDF
 for (i in seq(min(kvalrange), length(scatterpie_plots), by = 8)) {
