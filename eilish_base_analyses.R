@@ -34,9 +34,9 @@ library(RColorBrewer)
 library(ozmaps)
 library(adegenet)
 library(tidyr)
-library("viridis")
 library(diveRsity)
 library(RRtools)
+library(LEA)
 
 theme_set(theme_few())
 
@@ -78,7 +78,7 @@ devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/
 d1        <- new.read.dart.xls.onerow(RandRbase,species,dataset,topskip, euchits=FALSE, altcount=TRUE)
 qc1       <- report.dart.qc.stats(d1, RandRbase, species, dataset, threshold_missing_loci = 0.8)
 
-d2        <- remove.poor.quality.snps(d1, min_repro=0.96, max_missing=missing)
+d2        <- remove.poor.quality.snps(d1, min_repro=0.96, max_missing=missingness)
 qc2       <- report.dart.qc.stats(d2, RandRbase, species, dataset)
 
 d3        <- sample.one.snp.per.locus.random(d2, seed=214241)
@@ -211,7 +211,7 @@ species_map <- base_map+
 
 #calculate kinship by population 
 # VERY important that the population groups are true genetic groups and not conglomerates of multiple genetic groups
-kin <- individual_kinship_by_pop(dms, RandRbase, species, dataset, dms$meta$analyses[,species_col_name], maf=0.1, mis=missing, as_bigmat=TRUE)
+kin <- individual_kinship_by_pop(dms, RandRbase, species, dataset, dms$meta$analyses[,species_col_name], maf=0.1, mis=missingness, as_bigmat=TRUE)
 
 # Finding the clones
 kin2 <- as.data.frame(kin) %>%mutate_all(~replace(.,.<=clonal_threshold, 0)) #VERY IMPORTANT, removes all of the pairwise connections that are k<0.45 
@@ -295,7 +295,7 @@ draw(hma, merge_legend = TRUE)
 dev.off()
 
 
-################# dist 
+####################################### EUCLIDEAN DISTANCE ####################################### 
 
 
 col_fun2 = colorRamp2(c(0,0.5,1), c("white", "red","black"))
@@ -418,7 +418,7 @@ ggsave(paste0(species,"/outputs/plots/PCA_latitude_all.png"), plot = combined_la
 
 # calculate FST and geodist
 gds_file <- dart2gds(dms_no_n1_sites, RandRbase, species, dataset)
-pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=maf_val, miss_val=missing) #calculates genetic distance 
+pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=maf_val, miss_val=missingness) #calculates genetic distance 
 pS        <- population.pw.spatial.dist(dms_no_n1_sites, dms_no_n1_sites$meta$site) #calculates geographic distance between populations
 
 
@@ -521,6 +521,7 @@ geo <- Heatmap(mat,rect_gp = gpar(type = "none"),
 
 # make fst heatmap
 gene <- Heatmap(as.matrix(mat2[,1:nrow(mat2)]), rect_gp = gpar(type = "none"),
+                column_title = paste(species, "FST and geographic distance"),column_title_gp = gpar(fontsize = 20),#, fontface = "bold"
                 width = nrow(mat2)*unit(4, "mm"),
                 height = nrow(mat2)*unit(4, "mm"),
                 right_annotation = row_sp_ann,
@@ -544,12 +545,6 @@ gene <- Heatmap(as.matrix(mat2[,1:nrow(mat2)]), rect_gp = gpar(type = "none"),
 filename <- paste0(species, "/outputs/plots/FST_heatmap.pdf")
 gene_width <- nrow(mat2)*unit(4, "mm")
 pdf(filename, width = (((nrow(mat2)*4)/10) +8)*0.394, height = (((nrow(mat2)*4)/10)+5)*0.394)
-draw(geo + gene, ht_gap = -gene_width)
-dev.off()
-
-filename <- paste0(species, "/outputs/plots/FST_heatmap.png")
-gene_width <- nrow(mat2)*unit(4, "mm")
-png(filename, width = (((nrow(mat2)*4)/10) +8), height = (((nrow(mat2)*4)/10)+5), units="cm", res=400)
 draw(geo + gene, ht_gap = -gene_width)
 dev.off()
 
@@ -616,8 +611,7 @@ snmf_project <- load.snmfProject(lea_project)
 entropy <- t(summary(snmf_project)$crossEntropy) %>% as.data.frame()
 entropy_plot <- ggplot(entropy, aes(x=kvalrange, y=mean))+geom_point(colour="red")+
   labs(x="K", y="Mean ncross entropy")+
-  theme(axis.text = element_text(size=6), axis.title = element_text(size=8),
-        legend.position="none")
+  theme(legend.position="none")
 
 ggsave(paste0(species,"/outputs/plots/LEA_entropy.png"), plot = entropy_plot, width = 8, height = 5, dpi = 600, units = "cm")
 
@@ -684,13 +678,13 @@ ggsave(paste0(species,"/outputs/plots/LEA_scatterpie_map.pdf"), device="pdf",
 
 
 arranged_admix_plots <- admix_bar_plots[kvalrange]  # Subtract 1 because indexing is 0-based
-arranged_admix_plots <- wrap_plots(arranged_admix_plots, ncol = 1, nrow=6)  # Change the number of columns as desired
+arranged_admix_plots <- wrap_plots(arranged_admix_plots, ncol = 1, nrow=6) # Change the number of columns as desired
 ggsave(paste0(species,"/outputs/plots/LEA_barplots.pdf"), device="pdf",
        plot = arranged_admix_plots, width = 30, height = 40, units = "cm")
 
 
 ####################################### DIVERSITY ######################################
-site_stats <- species_site_stats(dms_1000, maf=0.05, pop_var=species_col_name, site_var=site_col_name, missing=missing)
+site_stats <- species_site_stats(dms_1000, maf=0.05, pop_var=species_col_name, site_var=site_col_name, missing=missingness)
 site_stats_merged <- merge(site_stats, final_summary[,c(1:4)], by=site_col_name)
 
 # Find the maximum of the two size variables
@@ -753,7 +747,7 @@ sample_miss_hist <- ggplot() + geom_histogram(aes(x = count_of_missing_by_sample
 locus_miss_hist <- ggplot() + geom_histogram(aes(x = count_of_missing_by_locus / num_loci), fill = "green", color = "black") +
   labs(x = "Proportion of loci that are missing", y = "Frequency")+theme(axis.title=element_text(size=8))
 
-af_ho_scatter <- ggplot(as.data.frame(AF.summary), aes(x = P, y = H)) + geom_point(alpha=0.3) +
+af_ho_scatter <- ggplot(as.data.frame(AF.summary), aes(x = P, y = H)) + geom_point(alpha=0.1) +
   labs(x = "Allele Frequency", y = "Heterozygosity")+theme(axis.title=element_text(size=8))
 
 QC_plots <- sample_miss_hist | locus_miss_hist | af_ho_scatter
@@ -769,3 +763,50 @@ clones_line <- paste("Number of unique genets (not filtered): ", length(unique(c
 report <- paste(species_line, pfsnps_line, snps_line,pfsamples_line,samples_line, clones_line,sep = "\n")
 
 
+####################################### FINAL ####################################### 
+
+page1 <- ((wrap_elements(grid::textGrob(report, gp = gpar(fontsize = 16)))/QC_plots) | species_map)
+
+page2 <-(wrap_elements(gridExtra::tableGrob(as.data.frame(final_summary),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm")))) |
+           ggarrange(site_map, pca_plot_pc12_site+coord_fixed(), common.legend = TRUE, legend="bottom") ) +
+  plot_layout(widths = c(2,3 ))+
+  plot_annotation(title = paste(species, 'site summary'))
+
+page3 <- combined_site_pca/combined_latitude_pca+
+  plot_annotation(title = paste(species, 'PCA'))
+
+page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(14,15,1,2,4:5,7,13)]),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm"))))) |
+             combined_stats_plot)+
+            plot_layout(widths = c(2,3)))+
+  plot_annotation(title = paste(species, 'diversity'),
+    caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering for MAF (', maf_val,') and missingness (',missingness,')'))
+
+page5 <-  arranged_scatterpie_plots + plot_annotation( title = paste(species, 'LEA plots') )
+
+page6 <-  (entropy_plot+theme(aspect.ratio = 2/3) | fst_manning) +
+  plot_annotation( title = paste(species, 'LEA entropy plot and FST by distance'),
+                   caption = paste0('Entropy note: The cross-entropy criterion assesses model fit for K populations by evaluating the prediction of masked genotypes,
+                                    \n with a lower cross-entropy indicating a better model fit and aiding in the selection of the number of ancestral populations\n
+                                    or the best model run for a fixed K value.'))
+
+pdf(paste0(species,"/outputs/plots/intermediate_plots.pdf"), width = 11, height = 8.5)
+plot(page1)
+plot(page2)
+plot(page3)
+plot(page4)
+plot(page5)
+plot(page6)
+dev.off()
+
+pdfs_to_combine <- c(paste0(species,"/outputs/plots/intermediate_plots.pdf"),
+                     paste0(species, "/outputs/plots/FST_heatmap.pdf"),
+                     # paste0(species,"/outputs/plots/LEA_scatterpie_map.pdf"),
+                     paste0(species,"/outputs/plots/LEA_barplots.pdf")  
+                     # paste0(species, "/outputs/plots/PLINK_kin_heatmap.pdf"),
+                     # paste0(species, "/outputs/plots/EUCLIDEAN_dist_heatmap.pdf")
+)
+
+qpdf::pdf_combine(input = pdfs_to_combine,
+                  output = paste0(species,"/outputs/",species,"_combined_outputs.pdf"))
+
+file.remove(paste0(species,"/outputs/plots/intermediate_plots.pdf"))
