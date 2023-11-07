@@ -285,8 +285,6 @@ hma <- Heatmap( as.matrix(kin_heatmap[ , c(1:(nrow(kin_heatmap)))]),
 )
 
 
-draw(hma, merge_legend = TRUE)
-
 # Set the file name and parameters
 heatmap_width <- nrow(kin_heatmap)*0.1 + 7
 heatmap_height <- nrow(kin_heatmap)*0.1 + 1
@@ -445,7 +443,7 @@ Fst_sig2 <- merge(Fst_sig, distinct(filtered_site_summary[,c(site_col_name,speci
 Fst_sig2 <- merge(Fst_sig2, distinct(filtered_site_summary[,c(site_col_name,species_col_name)]), by.x="Var2", by.y=site_col_name, all.y=FALSE)
 Fst_sig2$same_sp <- ifelse(Fst_sig2[,6]== Fst_sig2[,7], paste("Within", species_col_name), paste("Between", species_col_name))
 
-fstp1<- ggplot(Fst_sig2, aes(x= Geo_dist2, y=Fst, color=same_sp))+geom_point(size=1, alpha=0.3)+
+fst_manning <- ggplot(Fst_sig2, aes(x= Geo_dist2, y=Fst, color=same_sp))+geom_point(size=1, alpha=0.3)+
   labs(x="Distance (km)", y="FST", colour="Comparison")+
   # facet_zoom(x=Geo_dist2<2, zoom.size=1)+
   geom_hline(yintercept = 0.3, color="black", linetype="dotted")+
@@ -453,10 +451,10 @@ fstp1<- ggplot(Fst_sig2, aes(x= Geo_dist2, y=Fst, color=same_sp))+geom_point(siz
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position="bottom")+
   labs(title = paste("Mantel statistic r is", round(man$statistic, 3), ", P =", round(man$signif, 5)))+ theme(plot.title = element_text(size=10))
 
-fstp1
+fst_manning
 
 ggsave(paste0(species,"/outputs/plots/FST_manning.png"),
-       fstp1, width = 15, height = 10, units = "cm", dpi=600)
+       fst_manning, width = 15, height = 10, units = "cm", dpi=600)
 
 
 # Make heatmaps
@@ -514,8 +512,6 @@ geo <- Heatmap(mat,rect_gp = gpar(type = "none"),
                name="Distance (km)",
                heatmap_legend_param = list(title_gp = gpar(fontsize = 8),
                                            labels_gp = gpar(fontsize = 6)),
-               # cluster_rows = TRUE, 
-               # cluster_columns = TRUE,
                cell_fun = function(j, i, x, y, w, h, fill) {
                  if(i >= j) {
                    grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
@@ -548,6 +544,12 @@ gene <- Heatmap(as.matrix(mat2[,1:nrow(mat2)]), rect_gp = gpar(type = "none"),
 filename <- paste0(species, "/outputs/plots/FST_heatmap.pdf")
 gene_width <- nrow(mat2)*unit(4, "mm")
 pdf(filename, width = (((nrow(mat2)*4)/10) +8)*0.394, height = (((nrow(mat2)*4)/10)+5)*0.394)
+draw(geo + gene, ht_gap = -gene_width)
+dev.off()
+
+filename <- paste0(species, "/outputs/plots/FST_heatmap.png")
+gene_width <- nrow(mat2)*unit(4, "mm")
+png(filename, width = (((nrow(mat2)*4)/10) +8), height = (((nrow(mat2)*4)/10)+5), units="cm", res=400)
 draw(geo + gene, ht_gap = -gene_width)
 dev.off()
 
@@ -649,7 +651,7 @@ for (kval in kvalrange){
   agg_qdf <- aggregate(. ~ site, data = qdf4, FUN = mean)
   
   scatter_map <- base_map+ labs(fill="Source\npopulation")+
-  geom_scatterpie(mapping=aes(x=long, y=lat, group =site, r = diff(divxlims)/20),data =agg_qdf,
+  geom_scatterpie(mapping=aes(x=long, y=lat, group =site, r = diff(divxlims)/30),data =agg_qdf,
                     cols=colnames(agg_qdf)[2:(kval+1)],  alpha=1, size=0.1, colour="black", na.rm=TRUE)+
     labs(title=paste("K = ",kval))+theme(legend.position="none")
   
