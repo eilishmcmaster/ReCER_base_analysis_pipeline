@@ -360,36 +360,34 @@ pca_plot_pc12_species <- ggplot(g_pca_df2, aes(x=PC1, y=PC2, colour=!!sym(specie
 ggsave(paste0(species,"/outputs/plots/PCA_",species_col_name,"_PC12.png"), plot = pca_plot_pc12_species, width = 20, height = 15, dpi = 600, units = "cm")
 
 # site PCAs'
+pca_labels <- geom_text_repel(colour="black",size=2, max.overlaps=10,
+                              show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+
 
 pca_plot_pc12_site <- ggplot(g_pca_df2, 
                              aes(x=PC1, y=PC2,
-                                 colour=!!sym(site_col_name)))+ 
-  geom_point()+xlab(pcnames[1])+ylab(pcnames[2])+
+                                 colour=!!sym(site_col_name), label=!!sym(site_col_name)))+ 
+  xlab(pcnames[1])+ylab(pcnames[2])+geom_point()+
+  pca_labels+  scale_colour_manual(values=site_colours)+ 
   theme(legend.key.size = unit(0, 'lines'))+
-  scale_colour_manual(values=site_colours)+
-  geom_text_repel(data= g_pca_df2, mapping= aes(x=PC1, y=PC2,label=!!sym(site_col_name)),colour="black",
-                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+  guides(color = guide_legend(nrow = 4))
 
 pca_plot_pc23_site <- ggplot(g_pca_df2, 
                              aes(x=PC3, y=PC2,
-                                 colour=!!sym(site_col_name)))+ 
-  geom_point()+xlab(pcnames[3])+ylab(pcnames[2])+
+                                 colour=!!sym(site_col_name), label=!!sym(site_col_name)))+ 
+  xlab(pcnames[3])+ylab(pcnames[2])+geom_point()+scale_colour_manual(values=site_colours)+ 
   theme(legend.key.size = unit(0, 'lines'))+
-  scale_colour_manual(values=site_colours)+
-  geom_text_repel(data= g_pca_df2, mapping= aes(x=PC3, y=PC2,label=!!sym(site_col_name)),colour="black",
-                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+  pca_labels
 
 pca_plot_pc34_site <- ggplot(g_pca_df2, 
                              aes(x=PC3, y=PC4,
-                                 colour=!!sym(site_col_name)))+ 
-  geom_point()+xlab(pcnames[3])+ylab(pcnames[4])+
+                                 colour=!!sym(site_col_name), label=!!sym(site_col_name)))+ 
+  xlab(pcnames[3])+ylab(pcnames[4])+geom_point()+scale_colour_manual(values=site_colours)+ 
   theme(legend.key.size = unit(0, 'lines'))+
-  scale_colour_manual(values=site_colours)+
-  geom_text_repel(data= g_pca_df2, mapping= aes(x=PC3, y=PC4,label=!!sym(site_col_name)),colour="black",
-                  size=2, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+  pca_labels
 
 
-combined_site_pca <- ggarrange(pca_plot_pc12_site, pca_plot_pc23_site, pca_plot_pc34_site, ncol=3, common.legend = TRUE, legend="right")
+combined_site_pca <- ggarrange(pca_plot_pc12_site, pca_plot_pc23_site, pca_plot_pc34_site, ncol=3, common.legend = TRUE, legend="bottom")
 # combined_site_pca
 
 ggsave(paste0(species,"/outputs/plots/PCA_",site_col_name,"_all.png"), plot = combined_site_pca, width = 30, height = 10, dpi = 600, units = "cm")
@@ -412,7 +410,7 @@ pca_plot_pc34_lat <- ggplot(g_pca_df2, aes(x=PC3, y=PC4, colour=as.numeric(lat))
   geom_point()+xlab(pcnames[3])+ylab(pcnames[4])+
   scale_color_gradient(high = "red",low = "blue", na.value = "grey30")
 
-combined_latitude_pca <- ggarrange(pca_plot_pc12_lat, pca_plot_pc23_lat, pca_plot_pc34_lat, ncol=3, common.legend = TRUE, legend="right")
+combined_latitude_pca <- ggarrange(pca_plot_pc12_lat, pca_plot_pc23_lat, pca_plot_pc34_lat, ncol=3, common.legend = TRUE, legend="bottom")
 
 ggsave(paste0(species,"/outputs/plots/PCA_latitude_all.png"), plot = combined_latitude_pca, width = 30, height = 10, dpi = 600, units = "cm")
 
@@ -748,13 +746,13 @@ num_samples <- length(dms$sample_names)
 num_loci <- length(dms$gt)
 
 sample_miss_hist <- ggplot() + geom_histogram(aes(x = count_of_missing_by_sample / num_samples), fill = "blue", color = "black") +
-  labs(x = "Proportion of samples that are missing", y = "Frequency")
+  labs(x = "Proportion of samples that are missing", y = "Frequency")+theme(axis.title=element_text(size=8))
 
 locus_miss_hist <- ggplot() + geom_histogram(aes(x = count_of_missing_by_locus / num_loci), fill = "green", color = "black") +
-  labs(x = "Proportion of loci that are missing", y = "Frequency")
+  labs(x = "Proportion of loci that are missing", y = "Frequency")+theme(axis.title=element_text(size=8))
 
 af_ho_scatter <- ggplot(as.data.frame(AF.summary), aes(x = P, y = H)) + geom_point(alpha=0.3) +
-  labs(x = "Allele Frequency", y = "Heterozygosity")
+  labs(x = "Allele Frequency", y = "Heterozygosity")+theme(axis.title=element_text(size=8))
 
 QC_plots <- sample_miss_hist | locus_miss_hist | af_ho_scatter
 
@@ -768,22 +766,7 @@ clones_line <- paste("Number of unique genets (not filtered): ", length(unique(c
 
 report <- paste(species_line, pfsnps_line, snps_line,pfsamples_line,samples_line, clones_line,sep = "\n")
 
-# Create a data frame to store the report text
-report_df <- data.frame(
-  text = report, # Adjust the width as needed
-  x = 0.5,
-  y = 0.4
-)
 
-# Create a ggplot object with text elements
-text_plot <- ggplot(report_df, aes(x = x, y = y, label = text)) +
-  geom_text(size = 4, hjust = 0.5, vjust = 0.5, color = "black") +
-  theme_void() + 
-  coord_cartesian(clip = 'on')  # Allows the text to be outside the plot area
+page1 <- wrap_elements(grid::textGrob(report))/QC_plots
 
-text_plot
 
-page1 <- text_plot + QC_plots
-
-page1
-wrap_elements(grid::textGrob(report))+QC_plots
