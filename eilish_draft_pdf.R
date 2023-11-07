@@ -38,9 +38,9 @@ page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(14,15
             combined_stats_plot)+
   plot_layout(widths = c(2,3)))+
   plot_annotation(
-    title = 'The surprising truth about mtcars',
-    subtitle = 'These 3 plots will reveal yet-untold secrets about our beloved data-set',
-    caption = 'Disclaimer: None of these plots are insightful'
+    title = paste(species, 'diversity'),
+    # subtitle = 'These 3 plots will reveal yet-untold secrets about our beloved data-set',
+    caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering for MAF (', maf_val,') and missingness (',missingness,')')
   )
 
 page5 <- (entropy_plot+theme(aspect.ratio = 2/3) | arranged_scatterpie_plots)+plot_layout(widths = c(1,3))

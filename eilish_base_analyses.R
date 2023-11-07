@@ -52,7 +52,7 @@ raw_meta_path <- setup_variables[3, 2]
 
 topskip   <- 6
 nmetavar  <- 18
-missingness <- 0.3
+missingness <- 0.2
 maf_val <- 0.05
 
 
@@ -78,7 +78,7 @@ devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/
 d1        <- new.read.dart.xls.onerow(RandRbase,species,dataset,topskip, euchits=FALSE, altcount=TRUE)
 qc1       <- report.dart.qc.stats(d1, RandRbase, species, dataset, threshold_missing_loci = 0.8)
 
-d2        <- remove.poor.quality.snps(d1, min_repro=0.96, max_missing=0.2)
+d2        <- remove.poor.quality.snps(d1, min_repro=0.96, max_missing=missing)
 qc2       <- report.dart.qc.stats(d2, RandRbase, species, dataset)
 
 d3        <- sample.one.snp.per.locus.random(d2, seed=214241)
@@ -211,7 +211,7 @@ species_map <- base_map+
 
 #calculate kinship by population 
 # VERY important that the population groups are true genetic groups and not conglomerates of multiple genetic groups
-kin <- individual_kinship_by_pop(dms, RandRbase, species, dataset, dms$meta$analyses[,species_col_name], maf=0.1, mis=0.2, as_bigmat=TRUE)
+kin <- individual_kinship_by_pop(dms, RandRbase, species, dataset, dms$meta$analyses[,species_col_name], maf=0.1, mis=missing, as_bigmat=TRUE)
 
 # Finding the clones
 kin2 <- as.data.frame(kin) %>%mutate_all(~replace(.,.<=clonal_threshold, 0)) #VERY IMPORTANT, removes all of the pairwise connections that are k<0.45 
@@ -420,7 +420,7 @@ ggsave(paste0(species,"/outputs/plots/PCA_latitude_all.png"), plot = combined_la
 
 # calculate FST and geodist
 gds_file <- dart2gds(dms_no_n1_sites, RandRbase, species, dataset)
-pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=maf_val, miss_val=0.2) #calculates genetic distance 
+pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=maf_val, miss_val=missing) #calculates genetic distance 
 pS        <- population.pw.spatial.dist(dms_no_n1_sites, dms_no_n1_sites$meta$site) #calculates geographic distance between populations
 
 
@@ -688,7 +688,7 @@ ggsave(paste0(species,"/outputs/plots/LEA_barplots.pdf"), device="pdf",
 
 
 ####################################### DIVERSITY ######################################
-site_stats <- species_site_stats(dms_1000, maf=0.05, pop_var=species_col_name, site_var=site_col_name, missing=0.2)
+site_stats <- species_site_stats(dms_1000, maf=0.05, pop_var=species_col_name, site_var=site_col_name, missing=missing)
 site_stats_merged <- merge(site_stats, final_summary[,c(1:4)], by=site_col_name)
 
 # Find the maximum of the two size variables
@@ -759,7 +759,7 @@ QC_plots <- sample_miss_hist | locus_miss_hist | af_ho_scatter
 
 species_line <- paste("Species: ", species, "\nDataset: ", dataset, sep = "")
 pfsnps_line <- paste("Number of raw SNPs: ", length(d1$locus_names), sep = "")
-snps_line <- paste("Number of quality SNPs (0.2 missing threshold): ", length(dms$locus_names), sep = "")
+snps_line <- paste("Number of quality SNPs (",missingness,"missing threshold): ", length(dms$locus_names), sep = "")
 pfsamples_line <- paste("Number of prefilter samples: ", length(d1$sample_names), sep = "")
 samples_line <- paste("Number of quality samples: ", length(dms$sample_names), sep = "")
 clones_line <- paste("Number of unique genets (not filtered): ", length(unique(clones_out$genet)), sep = "")
