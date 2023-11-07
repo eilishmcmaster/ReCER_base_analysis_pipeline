@@ -152,6 +152,8 @@ total_summary <- site_samples_summary %>%
   group_by(!!sym(species_col_name)) %>%
   summarize(n_unfiltered = sum(n_unfiltered, na.rm=TRUE), n_filtered = sum(n_filtered, na.rm=TRUE))
 
+total_summary[site_col_name] <- "Total"
+
 # Combine the original and total summaries
 final_summary <- bind_rows(site_samples_summary, total_summary)
 
@@ -179,7 +181,7 @@ site_order <- names(site_colours)
 
 site_labels <-   geom_text_repel(data=final_summary[!is.na(final_summary$long)&!is.na(final_summary$n_filtered),],
                                  mapping=aes(x=long, y=lat, label=!!sym(site_col_name)),colour="black",
-                                 size=3, max.overlaps=20, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
+                                 size=3, max.overlaps=10, show.legend=FALSE,force_pull = 2, box.padding = 0.25, segment.size=0.1, min.segment.length = 0)
 
 ####################################### MAP ######################################
 
@@ -188,23 +190,22 @@ divylims <- c(min(final_summary$lat, na.rm=TRUE)-0.2,max(final_summary$lat, na.r
 
 base_map <- ggplot(ozmaps::abs_ste) + geom_sf(fill="grey96", colour="grey28") +
   coord_sf(xlim = divxlims, ylim = divylims) + labs(y=element_blank(), x=element_blank())+
-  theme(axis.text.x = element_text(angle=90, size=6),axis.text.y=element_text(size=6), legend.position = "none")+
+  theme(axis.text.x = element_text(angle=90, size=6),axis.text.y=element_text(size=6))+
   ggsn::scalebar(final_summary[!is.na(final_summary$long)&!is.na(final_summary$n_filtered),], dist = round(diff(divxlims)*20,-1), dist_unit = "km", location = "bottomright", 
                  st.bottom = F, st.size = 2, st.dist = 0.02,border.size =0.5,
                  transform = TRUE, model = "WGS84", height = 0.01)
 
-
-
-plain_map <- base_map+
+site_map <- base_map+
   geom_point(data=final_summary[!is.na(final_summary$long)&!is.na(final_summary$n_filtered),],
              mapping=aes(x=long, y=lat, fill=!!sym(site_col_name)), shape=21, size=2)+ 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.key.size = unit(0, 'lines'), legend.position="bottom")+
   scale_fill_manual(values=site_colours) + site_labels
 
-plain_map
-
-
-
+species_map <- base_map+
+  geom_point(data=final_summary[!is.na(final_summary$long)&!is.na(final_summary$n_filtered),],
+             mapping=aes(x=long, y=lat, fill=!!sym(species_col_name)), shape=21, size=2)+ 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.key.size = unit(0, 'lines'), legend.position="bottom")+
+  scale_fill_manual(values=sp_colours) + site_labels
 ###########################################  clones ########################################### 
 # find and remove clones using SNPrelate kinship 
 
@@ -259,12 +260,12 @@ kin_heatmap <- kin_heatmap[order(kin_heatmap[,site_col_name]),
                        c(order(kin_heatmap[,site_col_name]),(nrow(kin_heatmap)+1):ncol(kin_heatmap))] #order the table by genet 
 
 #create annotations
-site_ann <- HeatmapAnnotation(Location = dist_heatmap[,site_col_name],
+site_ann <- HeatmapAnnotation(Location = kin_heatmap[,site_col_name],
                               col = list(Location = site_colours),
                               annotation_name_gp = gpar(fontsize = 0))
 
 
-sp_ann <- HeatmapAnnotation(Species = dist_heatmap[,species_col_name],
+sp_ann <- HeatmapAnnotation(Species = kin_heatmap[,species_col_name],
                             col=list(Species=sp_colours),
                             na_col="white",
                             annotation_legend_param = list(labels_gp=gpar(fontface="italic")),
@@ -287,8 +288,8 @@ hma <- Heatmap( as.matrix(kin_heatmap[ , c(1:(nrow(kin_heatmap)))]),
 draw(hma, merge_legend = TRUE)
 
 # Set the file name and parameters
-heatmap_width <- nrow(dist_heatmap)*0.1 + 7
-heatmap_height <- nrow(dist_heatmap)*0.1 + 1
+heatmap_width <- nrow(kin_heatmap)*0.1 + 7
+heatmap_height <- nrow(kin_heatmap)*0.1 + 1
 
 filename <- paste0(species, "/outputs/plots/PLINK_kin_heatmap.pdf")
 pdf(filename, width = heatmap_width, height = heatmap_height)
@@ -355,7 +356,7 @@ pca_plot_pc12_species <- ggplot(g_pca_df2, aes(x=PC1, y=PC2, colour=!!sym(specie
   geom_point()+xlab(pcnames[1])+ylab(pcnames[2])+
   theme(legend.key.size = unit(0, 'lines'),# legend.position = "right",
         legend.text=element_text(face="italic"))+
-  scale_colour_manual(values=sp_colours)
+  scale_colour_manual(values=sp_colours) 
 
 ggsave(paste0(species,"/outputs/plots/PCA_",species_col_name,"_PC12.png"), plot = pca_plot_pc12_species, width = 20, height = 15, dpi = 600, units = "cm")
 
@@ -650,7 +651,7 @@ for (kval in kvalrange){
   scatter_map <- base_map+ labs(fill="Source\npopulation")+
   geom_scatterpie(mapping=aes(x=long, y=lat, group =site, r = diff(divxlims)/20),data =agg_qdf,
                     cols=colnames(agg_qdf)[2:(kval+1)],  alpha=1, size=0.1, colour="black", na.rm=TRUE)+
-    labs(title=paste("K = ",kval))
+    labs(title=paste("K = ",kval))+theme(legend.position="none")
   
   # make admix plot
   qdf_long <- pivot_longer(qdf3, cols=2:(kval+1), names_to="population", values_to="Q") 
@@ -714,9 +715,8 @@ he_map <- base_map + #site_labels+
   labs(title = "HE", size="HE")+
   scale_size_continuous(limits = het_range)
 
-fis_map <- base_map + site_labels+
-  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, color=fis), alpha=0.5)+
-  
+fis_map <- base_map + #site_labels+
+  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, color=fis), alpha=0.5)+ 
   scale_color_gradient2(high = "red",mid="white", midpoint = 0, low = "blue", na.value = "grey30")+
   geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
   theme(legend.position = "bottom", legend.direction = "vertical",
@@ -765,8 +765,5 @@ samples_line <- paste("Number of quality samples: ", length(dms$sample_names), s
 clones_line <- paste("Number of unique genets (not filtered): ", length(unique(clones_out$genet)), sep = "")
 
 report <- paste(species_line, pfsnps_line, snps_line,pfsamples_line,samples_line, clones_line,sep = "\n")
-
-
-page1 <- wrap_elements(grid::textGrob(report))/QC_plots
 
 

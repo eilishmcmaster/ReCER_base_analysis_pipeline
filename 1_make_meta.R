@@ -4,13 +4,15 @@ library(igraph)
 library(stringr)
 library(openxlsx)
 
-setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = FALSE)
+setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = TRUE)
+
 
 
 species <- setup_variables[1,2]
 dataset <- setup_variables[2, 2]
 RandRbase <- ""
 raw_meta_path <- setup_variables[3, 2]
+
 
 
 #####################  check for subdirs and make ##################### 
@@ -56,8 +58,8 @@ for (subdir in subsubdirectories) {
 
 
 #####################  read in raw meta and format ##################### 
+d1        <- new.read.dart.xls.onerow(RandRbase,species,dataset,topskip, euchits=FALSE, altcount=TRUE)
 
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # Check if the file exists
 if (file.exists(raw_meta_path)) {
   # Read the CSV file if it exists
@@ -67,7 +69,6 @@ if (file.exists(raw_meta_path)) {
   cat("Error: raw metadata not found\n")
 }
 
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 working_meta <- rnr_meta_raw[,c('nswNumber','acceptedName','decimalLatitude','decimalLongitude',
                                 'altitude','coordinateUncertainty','herbariumId','herbariumSpecimenIrn',
@@ -78,6 +79,8 @@ colnames(working_meta) <- c('sample','sp','lat','long',
                             'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate')
 
 #####################  make numeric sites ##################### 
+
+working_meta <- working_meta[working_meta$sample %in% d1$sample_names,]
 working_meta2 <- working_meta[!is.na(working_meta$lat)&!is.na(working_meta$long),]
 
 S <- mat.or.vec(nrow(working_meta2),nrow(working_meta2) )
