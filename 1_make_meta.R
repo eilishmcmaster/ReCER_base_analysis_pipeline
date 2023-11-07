@@ -41,7 +41,9 @@ for (subdir in subdirectories) {
   }
 }
 
-subsubdirectories <- c("outputs/plots", "outputs/tables", "outputs/r_files")
+subsubdirectories <- c(paste0("outputs_",site_col_name,"_",species_col_name,"/plots"),
+                       paste0("outputs_",site_col_name,"_",species_col_name,"/tables"),
+                       paste0("outputs_",site_col_name,"_",species_col_name,"/r_files"))
 
 # Check and create subdirectories if they don't exist
 for (subdir in subsubdirectories) {
@@ -102,6 +104,15 @@ distance_mat <-S/1000
 # group samples <1km apart
 
 distance_mat2 <- ifelse(distance_mat <= 1, 1, 0)
+
+# remove connections if sp is not the same!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+logical_matrix <- outer(working_meta2$sp[working_meta2$sample==rownames(distance_mat)],
+                                           working_meta2$sp[working_meta2$sample==colnames(distance_mat)], `==`)
+
+
+#
+
 dist_network <- igraph::graph_from_adjacency_matrix(as.matrix(distance_mat2), mode="undirected", diag=F)
 ceb <- cluster_fast_greedy(dist_network)
 ceb_net_plot <- plot(ceb, dist_network, vertex.label.color="transparent",vertex.size=2, edge.width=0.4)

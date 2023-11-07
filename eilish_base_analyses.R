@@ -89,7 +89,7 @@ m1        <- read.meta.data.full.analyses.df(d3, RandRbase, species, dataset)
 # m2 <- custom.read(species, dataset) %>% .[which(.$sample %in% m1$sample_names),]
 
 write.table(data.frame(sample=d3$sample_names[!(d3$sample_names %in% m1$sample_names)]), 
-            paste0(species,"/outputs/tables/samples_in_dart_not_in_meta.tsv"), sep="\t", row.names = FALSE)
+            paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/samples_in_dart_not_in_meta.tsv"), sep="\t", row.names = FALSE)
 
 dm        <- dart.meta.data.merge(d3, m1)
 
@@ -157,7 +157,7 @@ total_summary[site_col_name] <- "Total"
 # Combine the original and total summaries
 final_summary <- bind_rows(site_samples_summary, total_summary)
 
-write.xlsx(final_summary, paste0(species,"/outputs/tables/SUMMARY_",site_col_name,"_sample_numbers.xlsx"), asTable = FALSE, overwrite = TRUE)
+write.xlsx(final_summary, paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/SUMMARY_",site_col_name,"_sample_numbers.xlsx"), asTable = FALSE, overwrite = TRUE)
 
 
 ###########################################  Colour palettes ###########################################  
@@ -231,7 +231,7 @@ clones_out <- merge(clones, dms$meta$analyses[,c("sample","lat","long",site_col_
 clones_out <- clones_out[order(as.numeric(clones_out$genet)),] #order the table by genet 
 clones_out$genet <- as.numeric(clones_out$genet)
 
-write.xlsx(clones_out, paste0(species,"/outputs/tables/PLINK_clones.xlsx"), asTable = FALSE, overwrite = TRUE)
+write.xlsx(clones_out, paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/PLINK_clones.xlsx"), asTable = FALSE, overwrite = TRUE)
 
 ###########################################  kinship heatmap ####################################### 
 #### Kinship by distance ####
@@ -289,7 +289,7 @@ hma <- Heatmap( as.matrix(kin_heatmap[ , c(1:(nrow(kin_heatmap)))]),
 heatmap_width <- nrow(kin_heatmap)*0.1 + 7
 heatmap_height <- nrow(kin_heatmap)*0.1 + 1
 
-filename <- paste0(species, "/outputs/plots/PLINK_kin_heatmap.pdf")
+filename <- paste0(species, "/outputs_",site_col_name,"_",species_col_name,"/plots/PLINK_kin_heatmap.pdf")
 pdf(filename, width = heatmap_width, height = heatmap_height)
 draw(hma, merge_legend = TRUE)
 dev.off()
@@ -331,7 +331,7 @@ dist_heatmap_plot <- Heatmap( as.matrix(dist_heatmap[ , c(1:(nrow(dist_heatmap))
 # draw(dist_heatmap_plot, merge_legend = TRUE)
 
 # Set the file name and parameters
-filename <- paste0(species, "/outputs/plots/EUCLIDEAN_dist_heatmap.pdf")
+filename <- paste0(species, "/outputs_",site_col_name,"_",species_col_name,"/plots/EUCLIDEAN_dist_heatmap.pdf")
 pdf(filename, width = heatmap_width, height = heatmap_height)
 draw(dist_heatmap_plot, merge_legend = TRUE)
 dev.off()
@@ -356,7 +356,7 @@ pca_plot_pc12_species <- ggplot(g_pca_df2, aes(x=PC1, y=PC2, colour=!!sym(specie
         legend.text=element_text(face="italic"))+
   scale_colour_manual(values=sp_colours) 
 
-ggsave(paste0(species,"/outputs/plots/PCA_",species_col_name,"_PC12.png"), plot = pca_plot_pc12_species, width = 20, height = 15, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/PCA_",species_col_name,"_PC12.png"), plot = pca_plot_pc12_species, width = 20, height = 15, dpi = 600, units = "cm")
 
 # site PCAs'
 pca_labels <- geom_text_repel(colour="black",size=2, max.overlaps=10,
@@ -389,8 +389,8 @@ pca_plot_pc34_site <- ggplot(g_pca_df2,
 combined_site_pca <- ggarrange(pca_plot_pc12_site, pca_plot_pc23_site, pca_plot_pc34_site, ncol=3, common.legend = TRUE, legend="bottom")
 # combined_site_pca
 
-ggsave(paste0(species,"/outputs/plots/PCA_",site_col_name,"_all.png"), plot = combined_site_pca, width = 30, height = 10, dpi = 600, units = "cm")
-ggsave(paste0(species,"/outputs/plots/PCA_",site_col_name,"_PC12.png"), plot = pca_plot_pc12_site, width = 20, height = 15, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/PCA_",site_col_name,"_all.png"), plot = combined_site_pca, width = 30, height = 10, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/PCA_",site_col_name,"_PC12.png"), plot = pca_plot_pc12_site, width = 20, height = 15, dpi = 600, units = "cm")
 
 # latitude PCAs
 
@@ -411,7 +411,7 @@ pca_plot_pc34_lat <- ggplot(g_pca_df2, aes(x=PC3, y=PC4, colour=as.numeric(lat))
 
 combined_latitude_pca <- ggarrange(pca_plot_pc12_lat, pca_plot_pc23_lat, pca_plot_pc34_lat, ncol=3, common.legend = TRUE, legend="bottom")
 
-ggsave(paste0(species,"/outputs/plots/PCA_latitude_all.png"), plot = combined_latitude_pca, width = 30, height = 10, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/PCA_latitude_all.png"), plot = combined_latitude_pca, width = 30, height = 10, dpi = 600, units = "cm")
 
 
 ###########################################  FST ########################################### 
@@ -453,7 +453,7 @@ fst_manning <- ggplot(Fst_sig2, aes(x= Geo_dist2, y=Fst, color=same_sp))+geom_po
 
 fst_manning
 
-ggsave(paste0(species,"/outputs/plots/FST_manning.png"),
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/FST_manning.png"),
        fst_manning, width = 15, height = 10, units = "cm", dpi=600)
 
 
@@ -542,19 +542,19 @@ gene <- Heatmap(as.matrix(mat2[,1:nrow(mat2)]), rect_gp = gpar(type = "none"),
                 })
 
 # Set the file name and parameters
-filename <- paste0(species, "/outputs/plots/FST_heatmap.pdf")
+filename <- paste0(species, "/outputs_",site_col_name,"_",species_col_name,"/plots/FST_heatmap.pdf")
 gene_width <- nrow(mat2)*unit(4, "mm")
 pdf(filename, width = (((nrow(mat2)*4)/10) +8)*0.394, height = (((nrow(mat2)*4)/10)+5)*0.394)
 draw(geo + gene, ht_gap = -gene_width)
 dev.off()
 
 write.xlsx(list(geo_dist_km=mat, fst=mat2), 
-            paste0(species,"/outputs/tables/FST_GEODIST_by_",site_col_name,".xlsx"),rowNames = TRUE)
+            paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/FST_GEODIST_by_",site_col_name,".xlsx"),rowNames = TRUE)
 
 
 ###########################################  Visualise splitstree ########################################### 
 ## site splitstree
-# Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
+# Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs_",site_col_name,"_",species_col_name,"/r_files/nexus_file_for_R.nex'))
 # 
 # x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
 #                 sample=rep(NA, nrow(Nnet$.plot$vertices)))
@@ -586,7 +586,7 @@ write.xlsx(list(geo_dist_km=mat, fst=mat2),
 # splitstree_plot_site
 # 
 # 
-# ggsave(paste0(species,"/outputs/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
+# ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
 # 
 
 ########################################### LEA ########################################
@@ -613,7 +613,7 @@ entropy_plot <- ggplot(entropy, aes(x=kvalrange, y=mean))+geom_point(colour="red
   labs(x="K", y="Mean ncross entropy")+
   theme(legend.position="none")
 
-ggsave(paste0(species,"/outputs/plots/LEA_entropy.png"), plot = entropy_plot, width = 8, height = 5, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA_entropy.png"), plot = entropy_plot, width = 8, height = 5, dpi = 600, units = "cm")
 
 
 scatterpie_plots <- list()
@@ -673,13 +673,13 @@ for (kval in kvalrange){
 
 arranged_scatterpie_plots <- scatterpie_plots[kvalrange]  # Subtract 1 because indexing is 0-based
 arranged_scatterpie_plots <- wrap_plots(arranged_scatterpie_plots, ncol = 3, nrow=2)  # Change the number of columns as desired
-ggsave(paste0(species,"/outputs/plots/LEA_scatterpie_map.pdf"), device="pdf",
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA_scatterpie_map.pdf"), device="pdf",
        plot = arranged_scatterpie_plots, width = 17, height = 25, units = "cm")
 
 
 arranged_admix_plots <- admix_bar_plots[kvalrange]  # Subtract 1 because indexing is 0-based
 arranged_admix_plots <- wrap_plots(arranged_admix_plots, ncol = 1, nrow=6) # Change the number of columns as desired
-ggsave(paste0(species,"/outputs/plots/LEA_barplots.pdf"), device="pdf",
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA_barplots.pdf"), device="pdf",
        plot = arranged_admix_plots, width = 30, height = 40, units = "cm")
 
 
@@ -692,7 +692,7 @@ het_range <- range(min(site_stats_merged[,c('obs_het', 'exp_het')]), max(site_st
 
 
 write.xlsx(site_stats_merged, 
-            paste0(species,"/outputs/tables/DIVERSITY_",site_col_name,"_by_",species_col_name,".xlsx"), rowNames = FALSE)
+            paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/DIVERSITY_",site_col_name,"_by_",species_col_name,".xlsx"), rowNames = FALSE)
 
 
 ho_map <- base_map + #site_labels+
@@ -721,7 +721,7 @@ fis_map <- base_map + #site_labels+
 
 combined_stats_plot <- ( ho_map | he_map | fis_map ) / ncol(3)
 
-ggsave(paste0(species,"/outputs/plots/DIVERSITY_maps.png"), plot = combined_stats_plot, width = 30, height = 25, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/DIVERSITY_maps.png"), plot = combined_stats_plot, width = 30, height = 25, dpi = 600, units = "cm")
 
 ####################################### TEXT ####################################### 
 
@@ -789,7 +789,7 @@ page6 <-  (entropy_plot+theme(aspect.ratio = 2/3) | fst_manning) +
                                     \n with a lower cross-entropy indicating a better model fit and aiding in the selection of the number of ancestral populations\n
                                     or the best model run for a fixed K value.'))
 
-pdf(paste0(species,"/outputs/plots/intermediate_plots.pdf"), width = 11, height = 8.5)
+pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/intermediate_plots.pdf"), width = 11, height = 8.5)
 plot(page1)
 plot(page2)
 plot(page3)
@@ -798,15 +798,15 @@ plot(page5)
 plot(page6)
 dev.off()
 
-pdfs_to_combine <- c(paste0(species,"/outputs/plots/intermediate_plots.pdf"),
-                     paste0(species, "/outputs/plots/FST_heatmap.pdf"),
-                     # paste0(species,"/outputs/plots/LEA_scatterpie_map.pdf"),
-                     paste0(species,"/outputs/plots/LEA_barplots.pdf")  
-                     # paste0(species, "/outputs/plots/PLINK_kin_heatmap.pdf"),
-                     # paste0(species, "/outputs/plots/EUCLIDEAN_dist_heatmap.pdf")
+pdfs_to_combine <- c(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/intermediate_plots.pdf"),
+                     paste0(species, "/outputs_",site_col_name,"_",species_col_name,"/plots/FST_heatmap.pdf"),
+                     # paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA_scatterpie_map.pdf"),
+                     paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA_barplots.pdf")  
+                     # paste0(species, "/outputs_",site_col_name,"_",species_col_name,"/plots/PLINK_kin_heatmap.pdf"),
+                     # paste0(species, "/outputs_",site_col_name,"_",species_col_name,"/plots/EUCLIDEAN_dist_heatmap.pdf")
 )
 
 qpdf::pdf_combine(input = pdfs_to_combine,
-                  output = paste0(species,"/outputs/",species,"_combined_outputs.pdf"))
+                  output = paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/",species,"_combined_outputs.pdf"))
 
-file.remove(paste0(species,"/outputs/plots/intermediate_plots.pdf"))
+file.remove(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/intermediate_plots.pdf"))
