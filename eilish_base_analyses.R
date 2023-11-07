@@ -62,7 +62,7 @@ remove_pops_less_than_n5 <- setup_variables[6, 2]
 downsample <- setup_variables[7, 2]
 
 #Kinship threshold to considered samples as belonging to a single genet
-Clonal_threshold <- 0.4
+clonal_threshold <- 0.4
 #Number of samples to subsample populations to prior to analyses
 samples_per_pop <- 5
 
@@ -210,12 +210,10 @@ plain_map
 
 #calculate kinship by population 
 # VERY important that the population groups are true genetic groups and not conglomerates of multiple genetic groups
-# this can be species, subpops, or sites 
 kin <- individual_kinship_by_pop(dms, RandRbase, species, dataset, dms$meta$analyses[,species_col_name], maf=0.1, mis=0.2, as_bigmat=TRUE)
 
 # Finding the clones
-#https://kateto.net/netscix2016.html
-kin2 <- as.data.frame(kin) %>%mutate_all(~replace(.,.<=0.4, 0)) #VERY IMPORTANT, removes all of the pairwise connections that are k<0.45 
+kin2 <- as.data.frame(kin) %>%mutate_all(~replace(.,.<=clonal_threshold, 0)) #VERY IMPORTANT, removes all of the pairwise connections that are k<0.45 
 diag(kin2) <- 0
 kin3 <- kin2
 
@@ -223,12 +221,8 @@ kin3<- as.data.frame(kin3) %>%mutate_all(~replace(.,.>0, 1)) # replaces all rema
 
 # cluster the clones 
 network <- graph_from_adjacency_matrix(as.matrix(kin3), mode="undirected", diag=F,weighted=T) #makes the network based on k>0.45 
-plot(network)
 
 ceb <- cluster_fast_greedy(network) # makes cluster groupings
-
-#visualise groups
-plot(ceb, network, vertex.label.color="transparent", vertex.size=2, edge.width=0.4) #make the network plot
 
 # get clones 
 clones <-as.data.frame(cbind(genet=ceb$membership, sample=ceb$names)) #get the clones from the network as a df
@@ -236,72 +230,12 @@ clones_out <- merge(clones, dms$meta$analyses[,c("sample","lat","long",site_col_
 clones_out <- clones_out[order(as.numeric(clones_out$genet)),] #order the table by genet 
 clones_out$genet <- as.numeric(clones_out$genet)
 
-# Export data if you want 
-
 write.xlsx(clones_out, paste0(species,"/outputs/tables/PLINK_clones.xlsx"), asTable = FALSE, overwrite = TRUE)
-
-# 
-# # Remove duplicate clones from working data
-# #close clones with highest quality data (least missingess)
-# missingness_gt <- as.data.frame(rowSums(is.na(dms[["gt"]]))/ncol(dms[["gt"]])) #get missingness of all samples
-# colnames(missingness_gt) <- "missingness"
-# clone_missing <- merge(clones_out, missingness_gt, by.x="sample", by.y=0) # merge the clone data
-# clone_missing <- clone_missing[order(clone_missing$missingness),] #order by missingness low to high
-# 
-# unique_genets <- distinct(clone_missing, genet, .keep_all=TRUE) #keeps the top result for each genet (lowest missingness)
-# 
-# #make a list removing duplicate clones
-# non_clones <- dms$sample_names[which(!dms$sample_names %in% clones_out$sample)]
-# approved_clones <- unique_genets$sample
-# 
-# clones_dereplicated <- c(non_clones, approved_clones) # list of sample to keep
-# dms_pre_clone_removal <- dms
-# remove clones from dms
-# dms <- remove.by.list(dms, clones_dereplicated)
-
-# 
-# #### final sample number summary ####
-# 
-
-# # Clones Removed Site Summary
-# clones_removed_site_summary <- dms_pre_clone_removal$meta$analyses %>% as.data.frame()%>%
-#   group_by(!!sym(species_col_name), !!sym(site_col_name)) %>%
-#   summarize(n_clones_removed = sum(n())) %>%
-#   as.data.frame()
-# 
-# # Merge Site Samples Summary
-# site_samples_summary <- merge(filtered_site_summary, clones_removed_site_summary,
-#                               by = c(site_col_name, species_col_name), all.x = TRUE)
-# 
-# 
-# site_samples_summary <- site_samples_summary[,c(3,2,1,4,5)]
-# 
-# 
-# # Calculate total values per unique site_samples_summary[,1] value
-# total_summary <- site_samples_summary %>%
-#   group_by(species_col_name) %>%
-#   summarize(n_filtered = sum(n_filtered, na.rm=TRUE), n_no_clones = sum(n_no_clones, na.rm=TRUE)) %>%
-#   mutate(pop_large = "Total") %>%
-#   mutate(pop = "x") %>%
-#   as.data.frame()
-# 
-# # Combine the original and total summaries
-# final_summary <- rbind(site_samples_summary, total_summary)
-# 
-# final_summary <- final_summary[order(final_summary[,1], final_summary[,3], final_summary[,2]), ]
-# final_summary[final_summary$pop=="x","pop"] <- ""
-# 
-# colnames(final_summary) <- c("Genetic group","Subpopulation",site_col_name, "n (original)","n (no clones)")
-# 
-# final_summary
-# 
-# write.xlsx(final_summary, paste0(species,"/outputs/sites_sample_summary.xlsx"), asTable = FALSE, overwrite = TRUE)
-
 
 ###########################################  kinship heatmap ####################################### 
 #### Kinship by distance ####
 
-col_fun2 = colorRamp2(c(0,0.2,0.4), c("white", "red","black"))
+col_fun1 = colorRamp2(c(0,0.2,0.4), c("white", "red","black"))
 
 
 # kinship_df <- dist_kinship_matrix(dms$gt) %>% as.data.frame(.)
@@ -325,27 +259,24 @@ kin_heatmap <- kin_heatmap[order(kin_heatmap[,site_col_name]),
                        c(order(kin_heatmap[,site_col_name]),(nrow(kin_heatmap)+1):ncol(kin_heatmap))] #order the table by genet 
 
 #create annotations
+site_ann <- HeatmapAnnotation(Location = dist_heatmap[,site_col_name],
+                              col = list(Location = site_colours),
+                              annotation_name_gp = gpar(fontsize = 0))
 
-site_ann <- HeatmapAnnotation(Location = kin_heatmap[,site_col_name],
-                              col = list(Location = site_colours))
 
-
-
-sp_ann <- HeatmapAnnotation(Species = kin_heatmap[,species_col_name],
+sp_ann <- HeatmapAnnotation(Species = dist_heatmap[,species_col_name],
                             col=list(Species=sp_colours),
                             na_col="white",
                             annotation_legend_param = list(labels_gp=gpar(fontface="italic")),
-                            annotation_name_gp = gpar(fontsize = 10),
-                            annotation_name_side="left")
-
+                            annotation_name_gp = gpar(fontsize = 0))
 
 
 hma <- Heatmap( as.matrix(kin_heatmap[ , c(1:(nrow(kin_heatmap)))]), 
-                col=col_fun2, 
+                col=col_fun1, 
                 bottom_annotation=c(site_ann, sp_ann),
-                name = "Genetic similarity", #title of legend
-                row_names_gp = gpar(fontsize = 2),
-                column_names_gp = gpar(fontsize = 2),
+                name = "PLINK kinship", #title of legend
+                row_names_gp = gpar(fontsize = 6),
+                column_names_gp = gpar(fontsize = 6),
                 row_names_max_width = unit(15, "cm"),
                 border_gp = gpar(col = "black", lty = 1),
                 column_order=order(as.numeric(kin_heatmap[,site_col_name])),
@@ -356,15 +287,55 @@ hma <- Heatmap( as.matrix(kin_heatmap[ , c(1:(nrow(kin_heatmap)))]),
 draw(hma, merge_legend = TRUE)
 
 # Set the file name and parameters
-filename <- paste0(species, "/outputs/plots/PLINK_kin_heatmap.pdf")
-width <- 30
-height <- 20
+heatmap_width <- nrow(dist_heatmap)*0.1 + 7
+heatmap_height <- nrow(dist_heatmap)*0.1 + 1
 
-# Set up the PNG device
-pdf(filename, width = width, height = height)
-draw(hma)
+filename <- paste0(species, "/outputs/plots/PLINK_kin_heatmap.pdf")
+pdf(filename, width = heatmap_width, height = heatmap_height)
+draw(hma, merge_legend = TRUE)
 dev.off()
 
+
+################# dist 
+
+
+col_fun2 = colorRamp2(c(0,0.5,1), c("white", "red","black"))
+
+dist_raw <- as.matrix(dist(dms$gt, diag=TRUE))
+distship_df <- 1- (dist_raw/max(dist_raw, na.rm=TRUE)) %>% as.data.frame()
+distship_df$sample <- rownames(distship_df)
+
+dist_heatmap <- merge(distship_df, dms$meta$analyses[,c("sample","sp", "lat", species_col_name, site_col_name)],
+                     by="sample", all.x=TRUE, all.y=FALSE)
+dist_heatmap <- dist_heatmap[match(rownames(distship_df),dist_heatmap$sample),]
+rownames(dist_heatmap) <- dist_heatmap[,"sample"]
+
+dist_heatmap[,"sample"] <- NULL
+
+dist_heatmap[dist_heatmap[,site_col_name]=="no_geo_data",site_col_name] <- NA
+dist_heatmap[,site_col_name] <- as.numeric(dist_heatmap[,site_col_name])
+
+dist_heatmap <- dist_heatmap[order(dist_heatmap[,site_col_name]),
+                           c(order(dist_heatmap[,site_col_name]),(nrow(dist_heatmap)+1):ncol(dist_heatmap))] #order the table by genet 
+
+dist_heatmap_plot <- Heatmap( as.matrix(dist_heatmap[ , c(1:(nrow(dist_heatmap)))]), 
+                col=col_fun2, 
+                bottom_annotation=c(site_ann, sp_ann),
+                name = "Euclidean\ndistance", #title of legend
+                row_names_gp = gpar(fontsize = 6),
+                column_names_gp = gpar(fontsize = 6),
+                row_names_max_width = unit(15, "cm"),
+                border_gp = gpar(col = "black", lty = 1)
+)
+
+
+# draw(dist_heatmap_plot, merge_legend = TRUE)
+
+# Set the file name and parameters
+filename <- paste0(species, "/outputs/plots/EUCLIDEAN_dist_heatmap.pdf")
+pdf(filename, width = heatmap_width, height = heatmap_height)
+draw(dist_heatmap_plot, merge_legend = TRUE)
+dev.off()
 
 ################################################ PCA ################################################ 
 
@@ -421,8 +392,8 @@ pca_plot_pc34_site <- ggplot(g_pca_df2,
 combined_site_pca <- ggarrange(pca_plot_pc12_site, pca_plot_pc23_site, pca_plot_pc34_site, ncol=3, common.legend = TRUE, legend="right")
 # combined_site_pca
 
-ggsave(paste0(species,"/outputs/plots/PCA",site_col_name,"_all.png"), plot = combined_site_pca, width = 30, height = 10, dpi = 600, units = "cm")
-ggsave(paste0(species,"/outputs/plots/PCA",site_col_name,"_PC12.png"), plot = pca_plot_pc12_site, width = 20, height = 15, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs/plots/PCA_",site_col_name,"_all.png"), plot = combined_site_pca, width = 30, height = 10, dpi = 600, units = "cm")
+ggsave(paste0(species,"/outputs/plots/PCA_",site_col_name,"_PC12.png"), plot = pca_plot_pc12_site, width = 20, height = 15, dpi = 600, units = "cm")
 
 # latitude PCAs
 
@@ -442,7 +413,6 @@ pca_plot_pc34_lat <- ggplot(g_pca_df2, aes(x=PC3, y=PC4, colour=as.numeric(lat))
   scale_color_gradient(high = "red",low = "blue", na.value = "grey30")
 
 combined_latitude_pca <- ggarrange(pca_plot_pc12_lat, pca_plot_pc23_lat, pca_plot_pc34_lat, ncol=3, common.legend = TRUE, legend="right")
-combined_latitude_pca
 
 ggsave(paste0(species,"/outputs/plots/PCA_latitude_all.png"), plot = combined_latitude_pca, width = 30, height = 10, dpi = 600, units = "cm")
 
@@ -495,8 +465,6 @@ ggsave(paste0(species,"/outputs/plots/FST_manning.png"),
 geo_d <-pS$S #this is a square matrix
 mat <- geo_d/1000 # convert to km 
 
-
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #FST
 mat2 <-pFst$Fst
 mat2 <- merge(mat2, filtered_site_summary[,1:2], by.x=0, by.y=site_col_name, all.y=FALSE) #add aggregated df to mat2 (fst)
@@ -577,64 +545,18 @@ gene <- Heatmap(as.matrix(mat2[,1:nrow(mat2)]), rect_gp = gpar(type = "none"),
                   }
                 })
 
-gene_width <- nrow(mat2)*unit(4, "mm")
-
-draw(geo + gene, ht_gap = -gene_width)
-
 # Set the file name and parameters
 filename <- paste0(species, "/outputs/plots/FST_heatmap.pdf")
-width <- (((nrow(mat2)*4)/10) +8)*0.394
-height <- (((nrow(mat2)*4)/10)+5)*0.394
-
-# Set up the PNG device
-pdf(filename, width = width, height = height)
-
-# Draw the plot
+gene_width <- nrow(mat2)*unit(4, "mm")
+pdf(filename, width = (((nrow(mat2)*4)/10) +8)*0.394, height = (((nrow(mat2)*4)/10)+5)*0.394)
 draw(geo + gene, ht_gap = -gene_width)
-
-# Turn off the PNG device
 dev.off()
-
 
 write.xlsx(list(geo_dist_km=mat, fst=mat2), 
             paste0(species,"/outputs/tables/FST_GEODIST_by_",site_col_name,".xlsx"),rowNames = TRUE)
 
-###########################################  Visualise splitstree ########################################### 
-# 
-# splitstree(dist(dms$gt), paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
-# 
-# #need to open and save the file in Splitstree app for it to open here, IDK why
-# Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
-# 
-# x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
-#                 sample=rep(NA, nrow(Nnet$.plot$vertices)))
-# 
-# x[Nnet$translate$node,"sample"] <- Nnet$translate$label
-# x <- merge(x, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
-# 
-# net_x_axis <- max(x$x)-min(x$x)
-# net_y_axis <- max(x$y)-min(x$y)
-# 
-# Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .[1:length(Nnet$tip.label)]
-# 
-# 
-# 
-# splitstree_plot_species <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
-#                           as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
-#                           ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
-#                           ndigits = NULL)+
-#   geom_splitnet(layout = "slanted", size=0.2)+
-#   geom_point(data=x, aes(x, y, colour=!!sym(species_col_name)))+
-#   scale_colour_manual(values=sp_colours, na.translate=FALSE,
-#                       guide = guide_legend(species_col_name))+
-#   # geom_tiplab2(size=2, hjust=-0.2)+
-#   theme_void()+
-#   expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
-#                 y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
-#   theme(legend.text = element_text(face="italic"), legend.position = "top")+coord_fixed()
-# 
-# splitstree_plot_species
 
+###########################################  Visualise splitstree ########################################### 
 ## site splitstree
 # Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs/r_files/nexus_file_for_R.nex'))
 # 
@@ -677,8 +599,6 @@ kvalrange <- 2:7
 ##check for LEA FOLDER
 lea_project <- paste0(maindir,RandRbase,species,"/popgen/",treatment,"/lea/",species,"_",dataset,".snmfProject")
 
-# file.remove(list.files(paste0(maindir,RandRbase,species,"/popgen/",treatment,"/lea"), full.names = TRUE))
-
 if(!file.exists(lea_project)){
   nd_lea <- dart2lea(dms_no_n1_sites, RandRbase, species, dataset)
   snmf1=snmf(nd_lea, K=kvalrange, entropy = TRUE, repetitions = 1, project = "new")
@@ -697,6 +617,8 @@ entropy_plot <- ggplot(entropy, aes(x=kvalrange, y=mean))+geom_point(colour="red
   labs(x="K", y="Mean ncross entropy")+
   theme(axis.text = element_text(size=6), axis.title = element_text(size=8),
         legend.position="none")
+
+ggsave(paste0(species,"/outputs/plots/LEA_entropy.png"), plot = entropy_plot, width = 8, height = 5, dpi = 600, units = "cm")
 
 
 scatterpie_plots <- list()
@@ -734,12 +656,7 @@ for (kval in kvalrange){
   
   # make admix plot
   qdf_long <- pivot_longer(qdf3, cols=2:(kval+1), names_to="population", values_to="Q") 
-  
-  # # Order the data frame based on the index
-  # qdf_long <- qdf_long[order(match(qdf_long$site, site_order)), ]
-  # qdf_long$sample <- factor(qdf_long$sample, levels = unique(qdf_long$sample))
-  # 
-  # 
+
   admix_plot <- ggplot(qdf_long, 
                     aes(x=sample, #, labels=NULL),
                         y=Q, fill=population))+
@@ -753,67 +670,22 @@ for (kval in kvalrange){
     scale_y_continuous(limits = c(0,1.001), expand=c(0,0))+
     theme(strip.text.x = element_text(angle = 90, size=6), panel.spacing = unit(0.07, "lines"))+
     labs(title=paste("K = ",kval))
-  
-  
-  admix_plot_mini <- ggplot(qdf_long, 
-                       aes(x=Q,
-                           y=sample, fill=population))+
-    geom_bar(position="stack", stat="identity", show.legend = FALSE)+
-    theme_void()
-  
 
   scatterpie_plots[[kval]] <- scatter_map
   admix_bar_plots[[kval]] <- admix_plot
-  admix_bar_plots_mini[[kval]] <- admix_plot_mini
-  
-  # map_mini[[kval]] <- ggarrange(scatter_map+theme(plot.margin = unit(c(0,0,0,0), 'lines')),
-  #                               admix_plot_mini+theme(plot.margin = unit(c(0,0,0,0), 'lines')), align="hv", ncol=2, widths=c(3,2))
 }
 
 
-# Extract the plots based on the indices
-scatterpie_plots_to_arrange <- lapply(kvalrange, function(i) scatterpie_plots[[i]])
-# Arrange the plots using ggarrange
-arranged_scatterpie_plots <- ggarrange(plotlist = scatterpie_plots_to_arrange, ncol = 3, nrow = 2)
-arranged_scatterpie_plots
-
-plot_list <- scatterpie_plots
-# Arrange and plot ggplots corresponding to kvals 2:8
-arranged_plots <- plot_list[kvalrange]  # Subtract 1 because indexing is 0-based
-arranged_plots <- wrap_plots(arranged_plots, ncol = 3, nrow=2)  # Change the number of columns as desired
-
-# Display the arranged plots
-arranged_plots
-
-admix_plots_to_arrange <- lapply(kvalrange, function(i) admix_bar_plots[[i]])
-# arranged_admix_plots <- ggarrange(plotlist = admix_plots_to_arrange, ncol = 1, nrow = 8, common.legend = TRUE, 
-#                                   legend= "none")
+arranged_scatterpie_plots <- scatterpie_plots[kvalrange]  # Subtract 1 because indexing is 0-based
+arranged_scatterpie_plots <- wrap_plots(arranged_scatterpie_plots, ncol = 3, nrow=2)  # Change the number of columns as desired
+ggsave(paste0(species,"/outputs/plots/LEA_scatterpie_map.pdf"), device="pdf",
+       plot = arranged_scatterpie_plots, width = 17, height = 25, units = "cm")
 
 
-# Create a PDF file to save the plots
-max_plots_per_page <- 5
-pdf(paste0(species,"/outputs/plots/LEA_barplots.pdf"),width = 8.3, height = 11.7)
-# Loop through the list of ggplots and print them to the PDF
-for (i in seq(min(kvalrange), length(admix_bar_plots), by = max_plots_per_page)) {
-  end <- min(i + max_plots_per_page - 1, length(admix_bar_plots))
-  plots_to_print <- admix_bar_plots[i:end]
-  grid.arrange(grobs = plots_to_print, ncol = 1, nrow=5)
-}
-dev.off()
-
-# Create a PDF file to save the plots
-pdf(paste0(species,"/outputs/plots/LEA_scatterpie_map.pdf"),width = 8, height = 8.3)
-
-# Loop through the list of ggplots and print them to the PDF
-for (i in seq(min(kvalrange), length(scatterpie_plots), by = 8)) {
-  end <- min(i + 8 - 1, length(scatterpie_plots))
-  plots_to_print <- scatterpie_plots[i:end]
-  grid.arrange(grobs = plots_to_print, ncol = 4, nrow=2)
-}
-
-# Close the PDF file
-dev.off()
-
+arranged_admix_plots <- admix_bar_plots[kvalrange]  # Subtract 1 because indexing is 0-based
+arranged_admix_plots <- wrap_plots(arranged_admix_plots, ncol = 1, nrow=6)  # Change the number of columns as desired
+ggsave(paste0(species,"/outputs/plots/LEA_barplots.pdf"), device="pdf",
+       plot = arranged_admix_plots, width = 30, height = 40, units = "cm")
 
 
 ####################################### DIVERSITY ######################################
@@ -853,22 +725,11 @@ fis_map <- base_map + site_labels+
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
   labs(title="FIS")
 
-
-
 combined_stats_plot <- ( ho_map | he_map | fis_map ) / ncol(3)
-
 
 ggsave(paste0(species,"/outputs/plots/DIVERSITY_maps.png"), plot = combined_stats_plot, width = 30, height = 25, dpi = 600, units = "cm")
 
-######################## text 
-# "Species"
-# Dataset 
-# Raw SNPs
-# Filtered SNPs
-# Prefilter samples
-# Postfilter samples
-####################
-
+####################################### TEXT ####################################### 
 
 allele_frequency <- calculate.AF.summary(dms)
 ind_small_maf <- which((allele_frequency$P < maf_val) | allele_frequency$P > (1 - maf_val))
@@ -882,55 +743,47 @@ dat <- data.frame("species" = as.character(species), "dataset" = as.character(da
 missing_gt <- is.na(dms$gt)
 count_of_missing_by_locus <- rowSums(missing_gt)
 count_of_missing_by_sample <- colSums(missing_gt)
-
+AF.summary <- calculate.AF.summary(dms)  # Assuming dms is a data frame
 num_samples <- length(dms$sample_names)
 num_loci <- length(dms$gt)
 
-tiff(file = paste0(species,"/outputs/plots/QC_reportqc.tiff"), width = 8, units = "in", height = 3, res = 300)
-par(mfrow = c(1, 3))
-hist(count_of_missing_by_sample / num_samples, xlab = "proportion of samples that are missing", ylab = "frequency", main = "")
-hist(count_of_missing_by_locus / num_loci, 200, xlab = "proportion of loci that are missing", ylab = "frequency", main = "")
-AF.summary <- calculate.AF.summary(dms)  # HW summary
-plot(AF.summary$P, AF.summary$H, xlab = "Allele Frequency", ylab = "Heterozygosity", main = "")
-dev.off()
+sample_miss_hist <- ggplot() + geom_histogram(aes(x = count_of_missing_by_sample / num_samples), fill = "blue", color = "black") +
+  labs(x = "Proportion of samples that are missing", y = "Frequency")
 
-wrap_sentence <- function(string, width) {
-  words <- unlist(strsplit(string, " "))
-  fullsentence <- ""
-  checklen <- ""
-  for (i in 1:length(words)) {
-    checklen <- paste(checklen, words[i])
-    if (nchar(checklen) > (width + 1)) {
-      fullsentence <- paste0(fullsentence, "\n")
-      checklen <- ""
-    }
-    fullsentence <- paste(fullsentence, words[i])
-  }
-  fullsentence <- sub("^\\s", "", fullsentence)
-  fullsentence <- gsub("\n ", "\n", fullsentence)
-  return(fullsentence)
-}
+locus_miss_hist <- ggplot() + geom_histogram(aes(x = count_of_missing_by_locus / num_loci), fill = "green", color = "black") +
+  labs(x = "Proportion of loci that are missing", y = "Frequency")
 
-species_line <- paste("Species: ", species, ", Dataset:", dataset, sep = "")
+af_ho_scatter <- ggplot(as.data.frame(AF.summary), aes(x = P, y = H)) + geom_point(alpha=0.3) +
+  labs(x = "Allele Frequency", y = "Heterozygosity")
+
+QC_plots <- sample_miss_hist | locus_miss_hist | af_ho_scatter
+
+
+species_line <- paste("Species: ", species, "\nDataset: ", dataset, sep = "")
 pfsnps_line <- paste("Number of raw SNPs: ", length(d1$locus_names), sep = "")
 snps_line <- paste("Number of quality SNPs (0.2 missing threshold): ", length(dms$locus_names), sep = "")
 pfsamples_line <- paste("Number of prefilter samples: ", length(d1$sample_names), sep = "")
 samples_line <- paste("Number of quality samples: ", length(dms$sample_names), sep = "")
 clones_line <- paste("Number of unique genets (not filtered): ", length(unique(clones_out$genet)), sep = "")
 
-report <- paste(species_line,
-                pfsnps_line,
-                wrap_sentence(snps_line, 38),
-                pfsamples_line,
-                samples_line,
-                clones_line,
-                sep = "\n")
+report <- paste(species_line, pfsnps_line, snps_line,pfsamples_line,samples_line, clones_line,sep = "\n")
 
-tiff(paste0(species,"/outputs/plots/UQ_tableQCstats.tiff"), units = "in", width = 5, height = 2.3, res = 480)
-par(mar = c(0, 0, 0, 0), mai = c(0, 0, 0, 0))
-plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
-text(x = 0.5, y = 0.4, report, cex = 1.1, col = "black", pos = 4, offset = -10)
-dev.off()
+# Create a data frame to store the report text
+report_df <- data.frame(
+  text = report, # Adjust the width as needed
+  x = 0.5,
+  y = 0.4
+)
 
+# Create a ggplot object with text elements
+text_plot <- ggplot(report_df, aes(x = x, y = y, label = text)) +
+  geom_text(size = 4, hjust = 0.5, vjust = 0.5, color = "black") +
+  theme_void() + 
+  coord_cartesian(clip = 'on')  # Allows the text to be outside the plot area
 
+text_plot
 
+page1 <- text_plot + QC_plots
+
+page1
+wrap_elements(grid::textGrob(report))+QC_plots
