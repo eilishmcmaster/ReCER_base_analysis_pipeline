@@ -84,7 +84,7 @@ Once your `0_setup_variables.xlsx` is complete, open and run `1_make_meta.R`. Th
 It also creates additional subdirectories that your further analysis needs. 
 
 ### ! IMPORTANT !
-If you already have a metadata file that contains sample, site, lat, long etc, you **do not** have to run this step. Just make sure you specify your variables in `0_setup_variables.xlsx`.
+If you already have a metadata file that contains sample, site, lat, long etc, you **do not** have to use the metadata file produced here. You should still run this to make the required directories, but you can either delete the output meta or comment out line 154. Also make sure you specify your variables in `0_setup_variables.xlsx`.
 
 
 ## 5. Run analysis
