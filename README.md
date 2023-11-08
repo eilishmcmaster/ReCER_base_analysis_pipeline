@@ -57,7 +57,8 @@ When you're done it your directory should look like this:
 To set up your analysis, open `0_setup_variables.xlsx` in excel. This file contains input variables that the R scripts use to do your analyses. 
 
 Here is an example of what `0_setup_variables.xlsx` could look like:
-![image](https://github.com/eilishmcmaster/ReCER_base_analysis_pipeline/assets/67452867/0b361135-21e9-4b00-bbfb-a4ac7731f9a9)
+![image](https://github.com/eilishmcmaster/ReCER_base_analysis_pipeline/assets/67452867/cbf3dde2-6b50-417b-9f86-630e67f7b3e2)
+
 
 Make sure that you have entered the correct values for species, dataset, and raw_meta_path -- these will be specific to your project. The rest of the variables are generic, so you can change them or not. 
 
