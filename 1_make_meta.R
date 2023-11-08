@@ -3,6 +3,7 @@ library(dplyr)
 library(igraph)
 library(stringr)
 library(openxlsx)
+library(RRtools)
 
 setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = TRUE)
 
@@ -26,7 +27,7 @@ if (!dir.exists(species)) {
   cat(paste("Directory already exists:", species, "\n"))
 }
 
-subdirectories <- c("meta", "dart_raw", "popgen", "qual_stat", "outputs")
+subdirectories <- c("meta", "dart_raw", "popgen", "qual_stat")
 
 # Check and create subdirectories if they don't exist
 for (subdir in subdirectories) {
@@ -41,22 +42,6 @@ for (subdir in subdirectories) {
   }
 }
 
-subsubdirectories <- c(paste0("outputs_",site_col_name,"_",species_col_name,"/plots"),
-                       paste0("outputs_",site_col_name,"_",species_col_name,"/tables"),
-                       paste0("outputs_",site_col_name,"_",species_col_name,"/r_files"))
-
-# Check and create subdirectories if they don't exist
-for (subdir in subsubdirectories) {
-  
-  subdirectory_path <- file.path(paste0(species,'/',subdir))
-  
-  if (!dir.exists(subdirectory_path)) {
-    dir.create(subdirectory_path, recursive = TRUE)
-    cat(paste("Created directory:", subdirectory_path, "\n"))
-  } else {
-    cat(paste("Directory already exists:", subdirectory_path, "\n"))
-  }
-}
 
 
 #####################  read in raw meta and format ##################### 
@@ -107,9 +92,9 @@ distance_mat2 <- ifelse(distance_mat <= 1, 1, 0)
 
 # remove connections if sp is not the same!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-logical_matrix <- outer(working_meta2$sp[working_meta2$sample==rownames(distance_mat)],
-                                           working_meta2$sp[working_meta2$sample==colnames(distance_mat)], `==`)
-
+logical_matrix <- outer(working_meta2[working_meta2$sample==rownames(distance_mat),species_col_name],
+                                           working_meta2[working_meta2$sample==colnames(distance_mat),species_col_name], `==`)
+distance_mat2[!logical_matrix] <- 0
 
 #
 
@@ -163,6 +148,8 @@ working_meta4 <- working_meta4 %>%
 
 out_meta <- working_meta4[,c(1,16,3:4, 2, 5:15, 17:18,20)]
 colnames(out_meta)[2] <- "site"
+
+out_meta$none <- "all_species"
 
 write.xlsx(out_meta, paste0(species, "/meta/", species, "_", dataset, "_meta.xlsx"))
 
