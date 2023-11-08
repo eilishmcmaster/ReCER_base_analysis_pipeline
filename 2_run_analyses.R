@@ -9,7 +9,7 @@ library(RSplitsTree)
 # library(lubridate)
 library(ggplot2)
 library(dplyr)
-# library(data.table)
+library(data.table)
 library(ggrepel)
 library(tidyverse)
 library(ggsn)
@@ -22,7 +22,7 @@ library(igraph)
 library(SNPRelate)
 library(geosphere)
 library(reshape2)
-# library(vegan)
+library(vegan)
 # library(ggforce)
 library(openxlsx)
 # library(stringr)
@@ -49,23 +49,17 @@ species <- setup_variables[1,2]
 dataset <- setup_variables[2, 2]
 RandRbase <- ""
 raw_meta_path <- setup_variables[3, 2]
-
-topskip   <- 6
-nmetavar  <- 18
-missingness <- 0.5
-maf_val <- 0.1
-
-
 species_col_name <- setup_variables[4, 2]
 site_col_name <- setup_variables[5, 2] # this is the equivalent of analysis
 remove_pops_less_than_n5 <- setup_variables[6, 2]
 downsample <- setup_variables[7, 2]
+samples_per_pop <- setup_variables[8, 2]
+missingness <- setup_variables[9, 2]
+maf_val <- setup_variables[10, 2]
+clonal_threshold <- setup_variables[11, 2]
 
-#Kinship threshold to considered samples as belonging to a single genet
-clonal_threshold <- 0.4
-#Number of samples to subsample populations to prior to analyses
-samples_per_pop <- 5
-
+topskip   <- 6
+nmetavar  <- 18
 
 subsubdirectories <- c(paste0("outputs_",site_col_name,"_",species_col_name,"/plots"),
                        paste0("outputs_",site_col_name,"_",species_col_name,"/tables"),
@@ -580,7 +574,7 @@ write.xlsx(list(geo_dist_km=mat, fst=mat2),
 
 ###########################################  Visualise splitstree ########################################### 
 ## site splitstree
-splitstree(dist(dms$gt), paste0(species,'/outputs_",site_col_name,"_",species_col_name,"/r_files/nexus_file_for_R.nex'))
+splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/nexus_file_for_R.nex"))
 #
 # Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs_",site_col_name,"_",species_col_name,"/r_files/nexus_file_for_R.nex'))
 # 
