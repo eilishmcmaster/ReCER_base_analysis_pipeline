@@ -85,7 +85,7 @@ It also creates additional subdirectories that your further analysis needs.
 
 ### ! IMPORTANT !
 If you already have a metadata file that contains sample, site, lat, long etc, you **do not** have to use the metadata file produced here. You should still run this to make the required directories, but you can either delete the output meta or comment out line 154. Also make sure you specify your variables in `0_setup_variables.xlsx`.
-
+If you want to **exclude** samples, simply leave the `site_col_name` column blank for that sample.
 
 ## 5. Run analysis
 Once your metadata has been made you can run `2_run_analyses.R`. You shouldn't have to modify anything within the script, as variables are supplied through `0_setup_variables.xlsx`.
