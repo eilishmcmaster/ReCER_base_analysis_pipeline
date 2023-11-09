@@ -4,6 +4,7 @@ library(igraph)
 library(stringr)
 library(openxlsx)
 library(RRtools)
+devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/sos_functions.R?raw=TRUE")
 
 setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = TRUE)
 
