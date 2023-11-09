@@ -7,13 +7,18 @@ library(RRtools)
 devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/sos_functions.R?raw=TRUE")
 
 setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = TRUE)
-
-
-
 species <- setup_variables[1,2]
 dataset <- setup_variables[2, 2]
 RandRbase <- ""
 raw_meta_path <- setup_variables[3, 2]
+species_col_name <- setup_variables[4, 2]
+site_col_name <- setup_variables[5, 2] # this is the equivalent of analysis
+remove_pops_less_than_n5 <- setup_variables[6, 2]
+downsample <- setup_variables[7, 2]
+samples_per_pop <- setup_variables[8, 2] %>% as.numeric()
+missingness <- setup_variables[9, 2] %>% as.numeric()
+maf_val <- setup_variables[10, 2] %>% as.numeric()
+clonal_threshold <- setup_variables[11, 2] %>% as.numeric()
 
 
 
