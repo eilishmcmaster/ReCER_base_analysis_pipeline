@@ -717,7 +717,7 @@ write.xlsx(site_stats_merged,
 
 
 # Find the maximum of the two size variables
-het_range <- range(min(site_stats_merged[,c('obs_het', 'exp_het')]), max(site_stats_merged[,c('obs_het', 'exp_het')]))
+het_range <- range(min(site_stats_merged[,c('obs_het', 'exp_het')], na.rm=TRUE), max(site_stats_merged[,c('obs_het', 'exp_het')], na.rm=TRUE))
 
 ho_map <- base_map + #site_labels+
   geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size = obs_het), alpha = 0.3, color = "red") +
