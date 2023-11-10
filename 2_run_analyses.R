@@ -586,10 +586,10 @@ write.xlsx(list(geo_dist_km=mat, fst=mat2),
 ###########################################  Visualise splitstree ########################################### 
 ## site splitstree
 splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
-#
-# Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs_",site_col_name,"_",species_col_name,"/r_files/nexus_file_for_R.nex'))
 # 
-# x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2], 
+# Nnet <- phangorn::read.nexus.networx(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
+# 
+# x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2],
 #                 sample=rep(NA, nrow(Nnet$.plot$vertices)))
 # 
 # x[Nnet$translate$node,"sample"] <- Nnet$translate$label
@@ -602,15 +602,15 @@ splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_co
 # 
 # 
 # 
-# splitstree_plot_site <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL, 
-#                                   as.Date = FALSE, yscale = "none", yscale_mapping = NULL, 
-#                                   ladderize = FALSE, right = FALSE, branch.length = "branch.length", 
+# splitstree_plot_site <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL,
+#                                   as.Date = FALSE, yscale = "none", yscale_mapping = NULL,
+#                                   ladderize = FALSE, right = FALSE, branch.length = "branch.length",
 #                                   ndigits = NULL)+
 #   geom_splitnet(layout = "slanted", size=0.2)+
 #   geom_point(data=x, aes(x, y, colour=!!sym(site_col_name)))+
 #   scale_colour_manual(values=site_colours, na.translate=FALSE,
 #                       guide = guide_legend(site_col_name))+
-#   geom_tiplab2(size=2, hjust=-3)+
+#   geom_tiplab2(size=2, hjust=-2)+
 #   theme_void()+
 #   expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
 #                 y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
@@ -620,7 +620,7 @@ splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_co
 # 
 # 
 # ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
-# 
+
 
 ########################################### LEA ########################################
 kvalrange <- 2:7
@@ -769,18 +769,15 @@ dat <- data.frame("species" = as.character(species), "dataset" = as.character(da
                   "d1_nsamples" = nrow(d1$gt), "dms_nsamples" = nrow(dms$gt),
                   "maf" = maf_s)
 
-missing_gt <- is.na(dms$gt)
-count_of_missing_by_locus <- rowSums(missing_gt)
-count_of_missing_by_sample <- colSums(missing_gt)
+
 AF.summary <- calculate.AF.summary(dms)  # Assuming dms is a data frame
-num_samples <- length(dms$sample_names)
-num_loci <- length(dms$gt)
 
-sample_miss_hist <- ggplot() + geom_histogram(aes(x = count_of_missing_by_sample / num_samples), fill = "blue", color = "black") +
-  labs(x = "Proportion missing samples", y = "Frequency")+theme(axis.title=element_text(size=8))
 
-locus_miss_hist <- ggplot() + geom_histogram(aes(x = count_of_missing_by_locus / num_loci), fill = "green", color = "black") +
-  labs(x = "Proportion missing loci", y = "Frequency")+theme(axis.title=element_text(size=8))
+sample_miss_hist <- ggplot() + geom_histogram(aes(x = rowMeans(is.na(dms$gt))), fill = "blue", color = "black") +
+  labs(x = "Sample missingness", y = "Frequency")+theme(axis.title=element_text(size=8))
+
+locus_miss_hist <- ggplot() + geom_histogram(aes(x = colMeans(is.na(dms$gt))), fill = "green", color = "black") +
+  labs(x = "Locus missingness", y = "Frequency")+theme(axis.title=element_text(size=8))
 
 af_ho_scatter <- ggplot(as.data.frame(AF.summary), aes(x = P, y = H)) + geom_point(alpha=0.1) +
   labs(x = "Allele Frequency", y = "Heterozygosity")+theme(axis.title=element_text(size=8))
