@@ -96,7 +96,6 @@ qc3       <- report.dart.qc.stats(d3, RandRbase, species, dataset)
 
 #Load meta data and attach to dart data
 m1        <- read.meta.data.full.analyses.df(d3, RandRbase, species, dataset)
-# m2 <- custom.read(species, dataset) %>% .[which(.$sample %in% m1$sample_names),]
 
 write.table(data.frame(sample=d3$sample_names[!(d3$sample_names %in% m1$sample_names)]), 
             paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/samples_in_dart_not_in_meta.tsv"), sep="\t", row.names = FALSE)
@@ -106,6 +105,14 @@ dm        <- dart.meta.data.merge(d3, m1)
 # remove samples that are NA for site variable 
 samples_with_site_variable <- dm$sample_names[!is.na(dm$meta$analyses[,site_col_name])]
 dms2 <- remove.by.list(dm, samples_with_site_variable)
+
+samples_high_missing <- dms2$sample_names[which(rowMeans(is.na(dms2$gt))>missingness)]
+
+write.table(data.frame(sample=samples_high_missing, missingness=rowMeans(is.na(dms2$gt))[which(rowMeans(is.na(dms2$gt))>missingness)]), 
+            paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/high_missing_samples_removed.tsv"), sep="\t", row.names = FALSE)
+
+
+dms2 <- remove.by.missingness(dms2, missingness)
 
 dms <- dms2
 treatment <- dms$treatment
@@ -574,7 +581,7 @@ write.xlsx(list(geo_dist_km=mat, fst=mat2),
 
 ###########################################  Visualise splitstree ########################################### 
 ## site splitstree
-splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/nexus_file_for_R.nex"))
+splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
 #
 # Nnet <- phangorn::read.nexus.networx(paste0(species,'/outputs_",site_col_name,"_",species_col_name,"/r_files/nexus_file_for_R.nex'))
 # 
@@ -706,7 +713,7 @@ ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA
 
 
 ####################################### DIVERSITY ######################################
-site_stats <- species_site_stats(dms_1000, maf=maf_val, pop_var=species_col_name, site_var=site_col_name, missing=missingness)
+site_stats <- species_site_stats(dms, maf=maf_val, pop_var=species_col_name, site_var=site_col_name, missing=missingness)
 site_stats_merged <- merge(site_stats, final_summary[,c(1:4)], by=site_col_name)
 
 site_stats_merged <-site_stats_merged[order(match(site_stats_merged[,site_col_name], site_categories2)),]
