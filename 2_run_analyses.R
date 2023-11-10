@@ -106,13 +106,7 @@ dm        <- dart.meta.data.merge(d3, m1)
 samples_with_site_variable <- dm$sample_names[!is.na(dm$meta$analyses[,site_col_name])]
 dms2 <- remove.by.list(dm, samples_with_site_variable)
 
-samples_high_missing <- dms2$sample_names[which(rowMeans(is.na(dms2$gt))>missingness)]
 
-write.table(data.frame(sample=samples_high_missing, missingness=rowMeans(is.na(dms2$gt))[which(rowMeans(is.na(dms2$gt))>missingness)]), 
-            paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/high_missing_samples_removed.tsv"), sep="\t", row.names = FALSE)
-
-
-dms2 <- remove.by.missingness(dms2, missingness)
 
 dms <- dms2
 treatment <- dms$treatment
@@ -130,6 +124,16 @@ unfiltered_site_summary <- dms2$meta$analyses %>% as.data.frame()%>%
 
 
 ####################################### Remove populations with less than five samples ####################################### 
+
+samples_high_missing <- dms$sample_names[which(rowMeans(is.na(dms$gt))>missingness)]
+
+write.table(data.frame(sample=samples_high_missing, missingness=rowMeans(is.na(dms$gt))[which(rowMeans(is.na(dms$gt))>missingness)]), 
+            paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/high_missing_samples_removed.tsv"), sep="\t", row.names = FALSE)
+
+
+dms <- remove.by.missingness(dms, missingness)
+
+
 if(remove_pops_less_than_n5=="TRUE"){
   not_n5_sites <- as.vector(unfiltered_site_summary[unfiltered_site_summary$n_unfiltered<5,2]) #remove groups where n<=1
   not_n5_samples <- dms$sample_names[which(!(dms$meta$analyses[,site_col_name] %in% not_n5_sites))]
@@ -808,7 +812,7 @@ page2 <-(wrap_elements(gridExtra::tableGrob(as.data.frame(final_summary),theme =
 page3 <- combined_site_pca/combined_latitude_pca+
   plot_annotation(title = paste(species, 'PCA'))
 
-page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(14,15,1,2,4:5,7,13)]),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm"))))) |
+page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(13,14,15,1,3:4,6,12)]),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm"))))) |
              combined_stats_plot)+
             plot_layout(widths = c(2,3)))+
   plot_annotation(title = paste(species, 'diversity'),
