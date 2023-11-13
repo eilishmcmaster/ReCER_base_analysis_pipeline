@@ -135,10 +135,10 @@ write.table(data.frame(sample=samples_high_missing, sample_miss=rowMeans(is.na(d
 
 
 dms <- remove.by.missingness(dms, sample_miss)
-
+sites_high_missing_samples_removed <- table(dms$meta$analyses[,site_col_name])
 
 if(remove_pops_less_than_n5=="TRUE"){
-  not_n5_sites <- as.vector(unfiltered_site_summary[unfiltered_site_summary$n_unfiltered<5,2]) #remove groups where n<=1
+  not_n5_sites <- as.vector(names(which(sites_high_missing_samples_removed<samples_per_pop))) #remove groups where n<=1
   not_n5_samples <- dms$sample_names[which(!(dms$meta$analyses[,site_col_name] %in% not_n5_sites))]
   dms <- remove.by.list(dms, not_n5_samples)
   
