@@ -306,16 +306,21 @@ kin_heatmap <- kin_heatmap[order(kin_heatmap[,site_col_name]),
                        c(order(kin_heatmap[,site_col_name]),(nrow(kin_heatmap)+1):ncol(kin_heatmap))] #order the table by genet 
 
 #create annotations
-site_ann <- HeatmapAnnotation(Location = kin_heatmap[,site_col_name],
-                              col = list(Location = site_colours),
-                              annotation_name_gp = gpar(fontsize = 0))
+site_ann <- HeatmapAnnotation(Site = kin_heatmap[,site_col_name],
+                              col = list(Site = site_colours),
+                              annotation_name_gp = gpar(fontsize = 0),
+                              annotation_legend_param = list(labels_gp=gpar(fontsize=6),#fontface="italic",
+                                                             title_gp=gpar(fontsize=8),
+                                                             title=site_col_name))
 
 
 sp_ann <- HeatmapAnnotation(Species = kin_heatmap[,species_col_name],
                             col=list(Species=sp_colours),
                             na_col="white",
-                            annotation_legend_param = list(labels_gp=gpar(fontface="italic")),
-                            annotation_name_gp = gpar(fontsize = 0))
+                            annotation_name_gp = gpar(fontsize = 0),
+                            annotation_legend_param = list(labels_gp=gpar(fontsize=6),#fontface="italic",
+                                                           title_gp=gpar(fontsize=8),
+                                                           title=species_col_name))
 
 
 hma <- Heatmap( as.matrix(kin_heatmap[ , c(1:(nrow(kin_heatmap)))]), 
@@ -532,20 +537,24 @@ gene_col <-  colorRamp2(c(0,0.5,1), c("#8DD3C7", "white", "#FB8072"))
 palette <-  colorRamp2(c(0, max(mat, na.rm=TRUE)), c("white", "#80B1D3"))
 
 
-row_sp_ann <- rowAnnotation(Subpopulation = mat2[,species_col_name],
-                                       col=list(Subpopulation=sp_colours),
+row_sp_ann <- rowAnnotation(Species = mat2[,species_col_name],
+                                       col=list(Species=sp_colours),
                                        na_col="white",
                                        annotation_legend_param = list(labels_gp=gpar(fontsize=6),#fontface="italic",
-                                                                      title_gp=gpar(fontsize=8)),
+                                                                      title_gp=gpar(fontsize=8),
+                                                                      title=species_col_name),
                                        annotation_name_gp = gpar(fontsize = 0),
                                        annotation_name_side="top")
 
-bottom_sp_ann <- HeatmapAnnotation(Subpopulation = mat2[,species_col_name], 
-                                   col = list(Subpopulation = sp_colours),
+bottom_sp_ann <- HeatmapAnnotation(Species = mat2[,species_col_name], 
+                                   col = list(Species = sp_colours),
                                               annotation_name_gp = gpar(fontsize = 0),
                                               show_legend = FALSE,
                                               annotation_name_side="right",
-                                              na_col = "white")
+                                              na_col = "white",
+                                   annotation_legend_param = list(labels_gp=gpar(fontsize=6),#fontface="italic",
+                                                                  title_gp=gpar(fontsize=8),
+                                                                  title=species_col_name))
 
 geo <- Heatmap(mat,rect_gp = gpar(type = "none"),
                width = nrow(mat)*unit(4, "mm"),
