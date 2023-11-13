@@ -366,7 +366,7 @@ dist_heatmap <- dist_heatmap[order(dist_heatmap[,site_col_name]),
 dist_heatmap_plot <- Heatmap( as.matrix(dist_heatmap[ , c(1:(nrow(dist_heatmap)))]), 
                 col=col_fun2, 
                 bottom_annotation=c(site_ann, sp_ann),
-                name = "Euclidean\ndistance", #title of legend
+                name = "Inverse\nEuclidean\ndistance", #title of legend
                 row_names_gp = gpar(fontsize = 6),
                 column_names_gp = gpar(fontsize = 6),
                 row_names_max_width = unit(15, "cm"),
