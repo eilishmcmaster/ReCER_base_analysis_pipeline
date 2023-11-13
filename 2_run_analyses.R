@@ -54,9 +54,10 @@ site_col_name <- setup_variables[5, 2] # this is the equivalent of analysis
 remove_pops_less_than_n5 <- setup_variables[6, 2]
 downsample <- setup_variables[7, 2]
 samples_per_pop <- setup_variables[8, 2] %>% as.numeric()
-missingness <- setup_variables[9, 2] %>% as.numeric()
-maf_val <- setup_variables[10, 2] %>% as.numeric()
-clonal_threshold <- setup_variables[11, 2] %>% as.numeric()
+locus_miss <- setup_variables[9, 2] %>% as.numeric()
+sample_miss <- setup_variables[10, 2] %>% as.numeric()
+maf_val <- setup_variables[11, 2] %>% as.numeric()
+clonal_threshold <- setup_variables[12, 2] %>% as.numeric()
 
 topskip   <- 6
 nmetavar  <- 18
@@ -88,7 +89,7 @@ devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/
 d1        <- new.read.dart.xls.onerow(RandRbase,species,dataset,topskip, euchits=FALSE, altcount=TRUE)
 qc1       <- report.dart.qc.stats(d1, RandRbase, species, dataset, threshold_missing_loci = 0.8)
 
-d2        <- remove.poor.quality.snps(d1, min_repro=0.96, max_missing=missingness)
+d2        <- remove.poor.quality.snps(d1, min_repro=0.96, max_missing=locus_miss)
 qc2       <- report.dart.qc.stats(d2, RandRbase, species, dataset)
 
 d3        <- sample.one.snp.per.locus.random(d2, seed=214241)
@@ -125,13 +126,13 @@ unfiltered_site_summary <- dms2$meta$analyses %>% as.data.frame()%>%
 
 ####################################### Remove populations with less than five samples ####################################### 
 
-samples_high_missing <- dms$sample_names[which(rowMeans(is.na(dms$gt))>missingness)]
+samples_high_missing <- dms$sample_names[which(rowMeans(is.na(dms$gt))>sample_miss)]
 
-write.table(data.frame(sample=samples_high_missing, missingness=rowMeans(is.na(dms$gt))[which(rowMeans(is.na(dms$gt))>missingness)]), 
+write.table(data.frame(sample=samples_high_missing, sample_miss=rowMeans(is.na(dms$gt))[which(rowMeans(is.na(dms$gt))>sample_miss)]), 
             paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/high_missing_samples_removed.tsv"), sep="\t", row.names = FALSE)
 
 
-dms <- remove.by.missingness(dms, missingness)
+dms <- remove.by.missingness(dms, sample_miss)
 
 
 if(remove_pops_less_than_n5=="TRUE"){
@@ -246,7 +247,7 @@ species_map <- base_map+
 
 #calculate kinship by population 
 # VERY important that the population groups are true genetic groups and not conglomerates of multiple genetic groups
-kin <- individual_kinship_by_pop(dms, RandRbase, species, dataset, dms$meta$analyses[,species_col_name], maf=0.1, mis=missingness, as_bigmat=TRUE)
+kin <- individual_kinship_by_pop(dms, RandRbase, species, dataset, dms$meta$analyses[,species_col_name], maf=0.1, mis=locus_miss, as_bigmat=TRUE)
 kin[is.na(kin)] <- 0
 # Finding the clones
 kin3 <- ifelse(kin < clonal_threshold, 0, 1)
@@ -449,7 +450,7 @@ ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/PCA
 
 # calculate FST and geodist
 gds_file <- dart2gds(dms_no_n1_sites, RandRbase, species, dataset)
-pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=maf_val, miss_val=missingness) #calculates genetic distance 
+pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=maf_val, miss_val=locus_miss) #calculates genetic distance 
 pS        <- population.pw.spatial.dist(dms_no_n1_sites, dms_no_n1_sites$meta$site) #calculates geographic distance between populations
 
 
@@ -717,7 +718,7 @@ ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA
 
 
 ####################################### DIVERSITY ######################################
-site_stats <- species_site_stats(dms, maf=maf_val, pop_var=species_col_name, site_var=site_col_name, missing=missingness)
+site_stats <- species_site_stats(dms, maf=maf_val, pop_var=species_col_name, site_var=site_col_name, missing=locus_miss)
 site_stats_merged <- merge(site_stats, final_summary[,c(1:4)], by=site_col_name)
 
 site_stats_merged <-site_stats_merged[order(match(site_stats_merged[,site_col_name], site_categories2)),]
@@ -787,7 +788,7 @@ QC_plots <- sample_miss_hist | locus_miss_hist | af_ho_scatter
 
 species_line <- paste("Species: ", species, "\nDataset: ", dataset, sep = "")
 pfsnps_line <- paste("Number of raw SNPs: ", length(d1$locus_names), sep = "")
-snps_line <- paste("Number of quality SNPs (",missingness,"missing threshold): ", length(dms$locus_names), sep = "")
+snps_line <- paste("Number of quality SNPs (",locus_miss,"missing threshold): ", length(dms$locus_names), sep = "")
 pfsamples_line <- paste("Number of prefilter samples: ", length(d1$sample_names), sep = "")
 samples_line <- paste("Number of quality samples: ", length(dms$sample_names), sep = "")
 clones_line <- paste("Number of unique genets (not filtered): ", length(unique(clones_out$genet)), sep = "")
@@ -813,7 +814,7 @@ page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(13,14
              combined_stats_plot)+
             plot_layout(widths = c(2,3)))+
   plot_annotation(title = paste(species, 'diversity'),
-    caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering for MAF (', maf_val,') and missingness (',missingness,')'))
+    caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering for MAF (', maf_val,') and missingness (',locus_miss,')'))
 
 page5 <-  arranged_scatterpie_plots + plot_annotation( title = paste(species, 'LEA plots') )
 
