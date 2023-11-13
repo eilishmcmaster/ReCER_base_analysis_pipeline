@@ -99,8 +99,7 @@ qc3       <- report.dart.qc.stats(d3, RandRbase, species, dataset)
 
 #Load meta data and attach to dart data
 m1        <- read.meta.data.full.analyses.df(d3, RandRbase, species, dataset)
-x <- read.xlsx('/Users/eilishmcmaster/Documents/ReCER_base_analysis_pipeline/AcacSuav/meta/AcacSuav_DAca20-5040_meta.xlsx')
-x <- read.meta.data(d3, RandRbase, species, dataset, 5)
+
 write.table(data.frame(sample=d3$sample_names[!(d3$sample_names %in% m1$sample_names)]), 
             paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/samples_in_dart_not_in_meta.tsv"), sep="\t", row.names = FALSE)
 
@@ -465,8 +464,8 @@ ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/PCA
 
 # calculate FST and geodist
 gds_file <- dart2gds(dms_no_n1_sites, RandRbase, species, dataset)
-pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$site, RandRbase,species,dataset, maf_val=maf_val, miss_val=locus_miss) #calculates genetic distance 
-pS        <- population.pw.spatial.dist(dms_no_n1_sites, dms_no_n1_sites$meta$site) #calculates geographic distance between populations
+pFst      <- population.pw.Fst(dms_no_n1_sites, dms_no_n1_sites$meta$analyses[,site_col_name], RandRbase,species,dataset, maf_val=maf_val, miss_val=locus_miss) #calculates genetic distance 
+pS        <- population.pw.spatial.dist(dms_no_n1_sites, dms_no_n1_sites$meta$analyses[,site_col_name]) #calculates geographic distance between populations
 
 
 ####plot IBD plot
