@@ -40,24 +40,26 @@ library(LEA)
 
 theme_set(theme_few())
 
-maindir <- '/Users/eilishmcmaster/Documents/ReCER_base_analysis_pipeline/'
 
-setwd(maindir)
 
 setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = TRUE)
-species <- setup_variables[1,2]
-dataset <- setup_variables[2, 2]
+maindir <- setup_variables[1, 2]
+species <- setup_variables[2, 2]
+dataset <- setup_variables[3, 2]
 RandRbase <- ""
-raw_meta_path <- setup_variables[3, 2]
-species_col_name <- setup_variables[4, 2]
-site_col_name <- setup_variables[5, 2] # this is the equivalent of analysis
-remove_pops_less_than_n5 <- setup_variables[6, 2]
-downsample <- setup_variables[7, 2]
-samples_per_pop <- setup_variables[8, 2] %>% as.numeric()
-locus_miss <- setup_variables[9, 2] %>% as.numeric()
-sample_miss <- setup_variables[10, 2] %>% as.numeric()
-maf_val <- setup_variables[11, 2] %>% as.numeric()
-clonal_threshold <- setup_variables[12, 2] %>% as.numeric()
+raw_meta_path <- setup_variables[4, 2]
+species_col_name <- setup_variables[5, 2]
+site_col_name <- setup_variables[6, 2] # this is the equivalent of analysis
+remove_pops_less_than_n5 <- setup_variables[7, 2]
+downsample <- setup_variables[8, 2]
+samples_per_pop <- setup_variables[9, 2] %>% as.numeric()
+locus_miss <- setup_variables[10, 2] %>% as.numeric()
+sample_miss <- setup_variables[11, 2] %>% as.numeric()
+maf_val <- setup_variables[12, 2] %>% as.numeric()
+clonal_threshold <- setup_variables[13, 2] %>% as.numeric()
+custom_meta <- setup_variables[14, 2]
+
+setwd(maindir)
 
 topskip   <- 6
 nmetavar  <- 18
@@ -97,7 +99,8 @@ qc3       <- report.dart.qc.stats(d3, RandRbase, species, dataset)
 
 #Load meta data and attach to dart data
 m1        <- read.meta.data.full.analyses.df(d3, RandRbase, species, dataset)
-
+x <- read.xlsx('/Users/eilishmcmaster/Documents/ReCER_base_analysis_pipeline/AcacSuav/meta/AcacSuav_DAca20-5040_meta.xlsx')
+x <- read.meta.data(d3, RandRbase, species, dataset, 5)
 write.table(data.frame(sample=d3$sample_names[!(d3$sample_names %in% m1$sample_names)]), 
             paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/samples_in_dart_not_in_meta.tsv"), sep="\t", row.names = FALSE)
 
@@ -193,23 +196,35 @@ write.xlsx(final_summary, paste0(species,"/outputs_",site_col_name,"_",species_c
 
 
 ###########################################  Colour palettes ###########################################  
+
+
 sp_colours <- named_list_maker(dms$meta$analyses[,species_col_name], "Spectral", 9)
 
 sp_shapes <- 1:length(unique(dms$meta$analyses[,species_col_name]))
 names(sp_shapes) <- unique(dms$meta$analyses[,species_col_name])
 
-# get sites in order
-site_categories2 <- unique(dms$meta$analyses[,site_col_name])
-site_categories2 <- site_categories2[site_categories2!="no_geo_data"]
-site_categories2 <- c(site_categories2[order(as.numeric(site_categories2))], "no_geo_data")
-
-site_colours <- named_list_maker(site_categories2, "Set3", 12)
-site_colours['no_geo_data'] <- "grey30"
-
-site_shapes <- rep(1:25, length.out = length(site_categories2))
-names(site_shapes) <- unique(site_categories2)
-
-site_order <- names(site_colours)
+if(custom_meta=="FALSE"){
+  # get sites in order
+  site_categories2 <- unique(dms$meta$analyses[,site_col_name])
+  site_categories2 <- site_categories2[site_categories2!="no_geo_data"]
+  site_categories2 <- c(site_categories2[order(as.numeric(site_categories2))], "no_geo_data")
+  
+  site_colours <- named_list_maker(site_categories2, "Set3", 12)
+  site_colours['no_geo_data'] <- "grey30"
+  
+  site_shapes <- rep(1:25, length.out = length(site_categories2))
+  names(site_shapes) <- unique(site_categories2)
+  
+  site_order <- names(site_colours)
+}else{
+  # get sites in order
+  site_categories2 <- unique(dms$meta$analyses[,site_col_name])
+  site_colours <- named_list_maker(site_categories2, "Set3", 12)
+  site_shapes <- rep(1:25, length.out = length(site_categories2))
+  names(site_shapes) <- unique(site_categories2)
+  
+  site_order <- names(site_colours)
+}
 
 site_labels <-   geom_text_repel(data=filtered_site_summary,
                                  mapping=aes(x=long, y=lat, label=!!sym(site_col_name)),colour="black",
@@ -627,7 +642,7 @@ splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_co
 kvalrange <- 2:7
 
 ##check for LEA FOLDER
-lea_project <- paste0(maindir,RandRbase,species,"/popgen/",treatment,"/lea/",species,"_",dataset,".snmfProject")
+lea_project <- paste0(maindir,'/',species,"/popgen/",treatment,"/lea/",species,"_",dataset,".snmfProject")
 
 if(!file.exists(lea_project)){
   nd_lea <- dart2lea(dms_no_n1_sites, RandRbase, species, dataset)
@@ -719,6 +734,8 @@ ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA
 
 ####################################### DIVERSITY ######################################
 site_stats <- species_site_stats(dms, maf=maf_val, pop_var=species_col_name, site_var=site_col_name, missing=locus_miss)
+colnames(site_stats)[1] <- site_col_name
+colnames(site_stats)[14] <- species_col_name
 site_stats_merged <- merge(site_stats, final_summary[,c(1:4)], by=site_col_name)
 
 site_stats_merged <-site_stats_merged[order(match(site_stats_merged[,site_col_name], site_categories2)),]

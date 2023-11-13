@@ -7,18 +7,21 @@ library(RRtools)
 devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/sos_functions.R?raw=TRUE")
 
 setup_variables <- read.xlsx("0_setup_variables.xlsx", colNames = TRUE)
-species <- setup_variables[1,2]
-dataset <- setup_variables[2, 2]
+maindir <- setup_variables[1, 2]
+species <- setup_variables[2, 2]
+dataset <- setup_variables[3, 2]
 RandRbase <- ""
-raw_meta_path <- setup_variables[3, 2]
-species_col_name <- setup_variables[4, 2]
-site_col_name <- setup_variables[5, 2] # this is the equivalent of analysis
-remove_pops_less_than_n5 <- setup_variables[6, 2]
-downsample <- setup_variables[7, 2]
-samples_per_pop <- setup_variables[8, 2] %>% as.numeric()
-missingness <- setup_variables[9, 2] %>% as.numeric()
-maf_val <- setup_variables[10, 2] %>% as.numeric()
-clonal_threshold <- setup_variables[11, 2] %>% as.numeric()
+raw_meta_path <- setup_variables[4, 2]
+species_col_name <- setup_variables[5, 2]
+site_col_name <- setup_variables[6, 2] # this is the equivalent of analysis
+remove_pops_less_than_n5 <- setup_variables[7, 2]
+downsample <- setup_variables[8, 2]
+samples_per_pop <- setup_variables[9, 2] %>% as.numeric()
+locus_miss <- setup_variables[10, 2] %>% as.numeric()
+sample_miss <- setup_variables[11, 2] %>% as.numeric()
+maf_val <- setup_variables[12, 2] %>% as.numeric()
+clonal_threshold <- setup_variables[13, 2] %>% as.numeric()
+custom_meta <- setup_variables[14, 2]
 
 
 
@@ -65,11 +68,12 @@ if (file.exists(raw_meta_path)) {
 
 working_meta <- rnr_meta_raw[,c('nswNumber','acceptedName','decimalLatitude','decimalLongitude',
                                 'altitude','coordinateUncertainty','herbariumId','herbariumSpecimenIrn',
-                                'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate')]
+                                'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate','eventKey')]
 
-colnames(working_meta) <- c('sample','sp','lat','long',
-                            'altitude','coordinateUncertainty','herbariumId','herbariumSpecimenIrn',
-                            'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate')
+meta_colnames <- c('sample','sp','lat','long',
+                   'altitude','coordinateUncertainty','herbariumId','herbariumSpecimenIrn',
+                   'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate','eventKey')
+colnames(working_meta) <- meta_colnames
 
 #####################  make numeric sites ##################### 
 
@@ -151,10 +155,13 @@ working_meta4 <- working_meta4 %>%
 
 
 ##################### write meta file ##################### 
-
-out_meta <- working_meta4[,c(1,16,3:4, 2, 5:15, 17:18,20)]
-colnames(out_meta)[2] <- "site"
+out_columns <- c('sample','lat','long','site_ordered','sp',
+  'altitude','coordinateUncertainty','herbariumId','herbariumSpecimenIrn',
+  'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate','eventKey',
+  'mother','tissue','families',)
+out_meta <- working_meta4[,out_columns]
+colnames(out_meta)[4] <- "site"
 
 out_meta$none <- "all_species"
 
-write.xlsx(out_meta, paste0(species, "/meta/", species, "_", dataset, "_meta.xlsx"))
+# write.xlsx(out_meta, paste0(species, "/meta/", species, "_", dataset, "_meta.xlsx"))
