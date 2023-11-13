@@ -831,7 +831,7 @@ page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(13,14
              combined_stats_plot)+
             plot_layout(widths = c(2,3)))+
   plot_annotation(title = paste(species, 'diversity'),
-    caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering for MAF (', maf_val,') and missingness (',locus_miss,')'))
+    caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering loci for MAF (', maf_val,') and missingness (',locus_miss,')'))
 
 page5 <-  arranged_scatterpie_plots + plot_annotation( title = paste(species, 'LEA plots') )
 
