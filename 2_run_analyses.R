@@ -278,7 +278,7 @@ kinship_df <- kin %>% as.data.frame()
 kinship_df$sample <- rownames(kinship_df)
 
 
-kin_heatmap <- merge(kinship_df, dms$meta$analyses[,c("sample","sp", "lat", species_col_name, site_col_name)],
+kin_heatmap <- merge(kinship_df, dms$meta$analyses[,c("sample", "lat", species_col_name, site_col_name)],
                    by="sample", all.x=TRUE, all.y=FALSE)
 kin_heatmap <- kin_heatmap[match(rownames(kinship_df),kin_heatmap$sample),]
 rownames(kin_heatmap) <- kin_heatmap[,"sample"]
@@ -336,7 +336,7 @@ dist_raw <- as.matrix(dist(dms$gt, diag=TRUE))
 distship_df <- 1- (dist_raw/max(dist_raw, na.rm=TRUE)) %>% as.data.frame()
 distship_df$sample <- rownames(distship_df)
 
-dist_heatmap <- merge(distship_df, dms$meta$analyses[,c("sample","sp", "lat", species_col_name, site_col_name)],
+dist_heatmap <- merge(distship_df, dms$meta$analyses[,c("sample","lat", species_col_name, site_col_name)],
                      by="sample", all.x=TRUE, all.y=FALSE)
 dist_heatmap <- dist_heatmap[match(rownames(distship_df),dist_heatmap$sample),]
 rownames(dist_heatmap) <- dist_heatmap[,"sample"]
