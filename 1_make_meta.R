@@ -76,9 +76,11 @@ meta_colnames <- c('sample','sp','lat','long',
 colnames(working_meta) <- meta_colnames
 
 #####################  make numeric sites ##################### 
-
+working_meta <- working_meta %>%
+  mutate_at(vars(everything()), ~ifelse(. == "", NA, .))
 working_meta <- working_meta[working_meta$sample %in% d1$sample_names,]
 working_meta2 <- working_meta[!is.na(working_meta$lat)&!is.na(working_meta$long),]
+
 
 S <- mat.or.vec(nrow(working_meta2),nrow(working_meta2) )
 for (i in 1:nrow(working_meta2)) {
@@ -130,38 +132,46 @@ working_meta3$site_ordered[which(is.na(working_meta3$site_ordered))] <- "no_geo_
 working_meta3$new_site <- NULL
 
 ##################### clean mother/seedling data if present ##############################
-working_meta4 <- working_meta3 %>%
-  mutate(mother = ifelse(startsWith(collectionNotes, "This individual was germinated from seed collected from mother"), 
-                         str_extract(collectionNotes, "\\S+$"), 
-                         NA_character_))
 
-# Assuming your DataFrame is named df
-working_meta4 <- working_meta4 %>%
-  mutate(tissue = case_when(
-    str_detect(collectionNotes, "This individual was germinated from seed collected from mother") ~ "seedling",
-    str_detect(collectionNotes, "This individual is the mother of") ~ "mother",
-    TRUE ~ NA_character_
-  ))
 
-working_meta4$full_fam_mother <- working_meta4$mother
-working_meta4$full_fam_mother[which(working_meta4$tissue=="mother")] <- working_meta4$sample[which(working_meta4$tissue=="mother")]
-
-working_meta4 <- working_meta4 %>%
-  group_by(site_ordered) %>%
-  arrange(full_fam_mother) %>%
-  mutate(families = ifelse(!is.na(full_fam_mother), paste0("site", site_ordered,"_fam", dense_rank(full_fam_mother)), NA)) %>%
-  ungroup()
-# 
-
+if(any(grepl("This individual", working_meta3$collectionNotes, ignore.case = FALSE))){
+  working_meta4 <- working_meta3 %>%
+    mutate(mother = ifelse(startsWith(collectionNotes, "This individual was germinated from seed collected from mother"), 
+                           str_extract(collectionNotes, "\\S+$"), 
+                           NA_character_))
+  
+  # Assuming your DataFrame is named df
+  working_meta4 <- working_meta4 %>%
+    mutate(tissue = case_when(
+      str_detect(collectionNotes, "This individual was germinated from seed collected from mother") ~ "seedling",
+      str_detect(collectionNotes, "This individual is the mother of") ~ "mother",
+      TRUE ~ NA_character_
+    ))
+  
+  working_meta4$full_fam_mother <- working_meta4$mother
+  working_meta4$full_fam_mother[which(working_meta4$tissue=="mother")] <- working_meta4$sample[which(working_meta4$tissue=="mother")]
+  
+  working_meta4 <- working_meta4 %>%
+    group_by(site_ordered) %>%
+    arrange(full_fam_mother) %>%
+    mutate(families = ifelse(!is.na(full_fam_mother), paste0("site", site_ordered,"_fam", dense_rank(full_fam_mother)), NA)) %>%
+    ungroup()
+}else{
+  working_meta4 <- working_meta3
+  working_meta4$mother <- NA
+  working_meta4$tissue <- NA
+  working_meta4$full_fam_mother <- NA
+  working_meta4$families <- NA
+}
 
 ##################### write meta file ##################### 
 out_columns <- c('sample','lat','long','site_ordered','sp',
   'altitude','coordinateUncertainty','herbariumId','herbariumSpecimenIrn',
   'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate','eventKey',
-  'mother','tissue','families',)
+  'mother','tissue','families')
 out_meta <- working_meta4[,out_columns]
 colnames(out_meta)[4] <- "site"
 
 out_meta$none <- "all_species"
 
-write.xlsx(out_meta, paste0(species, "/meta/", species, "_", dataset, "_meta.xlsx"))
+# write.xlsx(out_meta, paste0(species, "/meta/", species, "_", dataset, "_meta.xlsx"))
