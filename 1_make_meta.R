@@ -14,15 +14,15 @@ RandRbase <- ""
 raw_meta_path <- setup_variables[4, 2]
 species_col_name <- setup_variables[5, 2]
 site_col_name <- setup_variables[6, 2] # this is the equivalent of analysis
-remove_pops_less_than_n5 <- setup_variables[7, 2]
-downsample <- setup_variables[8, 2]
-samples_per_pop <- setup_variables[9, 2] %>% as.numeric()
-locus_miss <- setup_variables[10, 2] %>% as.numeric()
-sample_miss <- setup_variables[11, 2] %>% as.numeric()
-maf_val <- setup_variables[12, 2] %>% as.numeric()
-clonal_threshold <- setup_variables[13, 2] %>% as.numeric()
-custom_meta <- setup_variables[14, 2]
-
+site_distances <- setup_variables[7, 2]
+remove_pops_less_than_n5 <- setup_variables[8, 2]
+downsample <- setup_variables[9, 2]
+samples_per_pop <- setup_variables[10, 2] %>% as.numeric()
+locus_miss <- setup_variables[11, 2] %>% as.numeric()
+sample_miss <- setup_variables[12, 2] %>% as.numeric()
+maf_val <- setup_variables[13, 2] %>% as.numeric()
+clonal_threshold <- setup_variables[14, 2] %>% as.numeric()
+custom_meta <- setup_variables[15, 2]
 
 
 #####################  check for subdirs and make ##################### 
@@ -66,7 +66,7 @@ if (file.exists(raw_meta_path)) {
 }
 
 
-working_meta <- rnr_meta_raw[,c('nswNumber','fieldSpeciesName','decimalLatitude','decimalLongitude',
+working_meta <- rnr_meta_raw[,c('nswNumber','acceptedName','decimalLatitude','decimalLongitude',
                                 'altitude','coordinateUncertainty','herbariumId','herbariumSpecimenIrn',
                                 'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate','eventKey')]
 
@@ -100,9 +100,9 @@ rownames(S) <- working_meta2$sample
 distance_mat <-S/1000
 # group samples <1km apart
 
-distance_mat2 <- ifelse(distance_mat <= 1, 1, 0)
+distance_mat2 <- ifelse(distance_mat <= site_distances, 1, 0)
 
-# remove connections if sp is not the same!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# remove connections if sp is not the same
 
 logical_matrix <- outer(working_meta2[working_meta2$sample==rownames(distance_mat),species_col_name],
                                            working_meta2[working_meta2$sample==colnames(distance_mat),species_col_name], `==`)
