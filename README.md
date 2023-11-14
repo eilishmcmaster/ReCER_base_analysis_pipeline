@@ -57,7 +57,8 @@ When you're done it your directory should look like this:
 To set up your analysis, open `0_setup_variables.xlsx` in excel. This file contains input variables that the R scripts use to do your analyses. 
 
 Here is an example of what `0_setup_variables.xlsx` could look like:
-![image](https://github.com/eilishmcmaster/ReCER_base_analysis_pipeline/assets/67452867/f2015f9d-963d-4a9a-b5f5-775bb712c60b)
+![image](https://github.com/eilishmcmaster/ReCER_base_analysis_pipeline/assets/67452867/48773b98-922e-4373-a219-374f743d06f8)
+
 
 
 
