@@ -66,7 +66,7 @@ if (file.exists(raw_meta_path)) {
 }
 
 
-working_meta <- rnr_meta_raw[,c('nswNumber','acceptedName','decimalLatitude','decimalLongitude',
+working_meta <- rnr_meta_raw[,c('nswNumber','fieldSpeciesName','decimalLatitude','decimalLongitude',
                                 'altitude','coordinateUncertainty','herbariumId','herbariumSpecimenIrn',
                                 'locality', 'plants10m','adultsPresent','juvenilesPresent','populationNotes','collectionNotes','sampleDate','eventKey')]
 
