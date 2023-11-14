@@ -6,7 +6,7 @@ This will make your metadata file for you and run an analysis.
 ## Summary 
 1. set up directories, download metadata from RNR, and download dart data
 2. clone this git to get scripts
-3. customise `0_setup_variables.xlsx` (Variables `species`, `dataset`, and `raw_meta_path` **must** be changed, others can be left default)
+3. customise `0_setup_variables.xlsx` (Variables `maindir`, `species`, `dataset`, and `raw_meta_path` **must** be changed, others can be left default)
 4. run `1_make_meta.R` which makes metadata file, including automatically creating sites based on distance
 5. run `2_run_analyses.R` which produces summary pdf output as well as specific plots and tables
 
@@ -57,20 +57,21 @@ When you're done it your directory should look like this:
 To set up your analysis, open `0_setup_variables.xlsx` in excel. This file contains input variables that the R scripts use to do your analyses. 
 
 Here is an example of what `0_setup_variables.xlsx` could look like:
-![image](https://github.com/eilishmcmaster/ReCER_base_analysis_pipeline/assets/67452867/cbf3dde2-6b50-417b-9f86-630e67f7b3e2)
+![image](https://github.com/eilishmcmaster/ReCER_base_analysis_pipeline/assets/67452867/f2015f9d-963d-4a9a-b5f5-775bb712c60b)
 
 
-Make sure that you have entered the correct values for species, dataset, and raw_meta_path -- these will be specific to your project. The rest of the variables are generic, so you can change them or not. 
+
+Make sure that you have entered the correct values for `maindir`, `species`, `dataset`, and `raw_meta_path` -- these will be specific to your project. The rest of the variables are generic, so you can change them or not. 
 
 ### ! IMPORTANT !
-The variables `species_col_name` and `site_col_name` are very important for your analysis. 
+The variables `species_col_name` and `site_col_name` are very important for your analysis. You cannot have multiple `species_col_name` conditions with the same `site_col_name` conditions i.e. sites cannot contain multiple species.
 
 In your analyses, `species_col_name` specifies the variable containing species/genetic groups. This is used for visualisation (e.g. map of different `species_col_name` groups) and diversity analyses (i.e. in diversity analysis, your loci are filtered to be relevant by `species_col_name` groups). The default workflow will use the species names in RNR (column `sp` in meta file produced by `1_make_meta.R`).
 * If you have multiple species in your dataset and you're confident about their IDs, use the default `species_col_name` = `sp`
 * If you are **not** confident about species in your dataset, use `species_col_name` = `none`
 * If you have custom genetic groups or species, use your custom column name in you metadata e.g. `species_col_name` = `genetic_groups_custom` (you will have to add your custom columns to the metadata AFTER running `1_make_meta.R`
 
-In your analyses, `site_col_name` specifies the variable used for sites or populations. By default this is set to the `site` variable, which is created by `1_make_meta.R` by grouping geographically proxumate samples (i.e. samples<1km apart are in the same site). If you would prefer to use a different metadata variable as `site_col_name`, specify this in `0_setup_variables.xlsx`.
+In your analyses, `site_col_name` specifies the variable used for sites or populations. By default this is set to the `site` variable, which is created by `1_make_meta.R` by grouping geographically proximate samples (i.e. samples<1km apart are in the same site). If you would prefer to use a different metadata variable as `site_col_name`, specify this in `0_setup_variables.xlsx`.
 
 
 ## 4. Generate metadata
