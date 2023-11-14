@@ -844,9 +844,9 @@ dev.off()
 
 final_summary_df <- as.data.frame(final_summary)
 
-if (nrow(final_summary_df) > 50) {
+if (nrow(final_summary_df) > 40) {
   # Split into chunks of 20 rows each
-  chunk_size <- 60
+  chunk_size <- 40
   num_chunks <- ceiling(nrow(final_summary_df) / chunk_size)
   
   # Create a list to store tables
@@ -897,9 +897,9 @@ dev.off()
 ###
 stats_to_print <- as.data.frame(site_stats[,c(13,14,15,1,3:4,6,12)])
 
-if (nrow(stats_to_print) > 50) {
+if (nrow(stats_to_print) > 40) {
   # Split into chunks of 20 rows each
-  chunk_size <- 60
+  chunk_size <- 40
   num_chunks <- ceiling(nrow(stats_to_print) / chunk_size)
   
   # Create a list to store tables
