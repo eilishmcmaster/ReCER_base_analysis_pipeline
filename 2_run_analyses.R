@@ -915,20 +915,25 @@ if (nrow(stats_to_print) > 50) {
   }
   
   # Create multiple pages with arranged tables
-  pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page4.pdf"))
+  pdf(paste0(species, "/outputs_", site_col_name, "_", species_col_name, "/plots/page4.pdf"))
+  
+  # Initial plot with annotations
+  plot(combined_stats_plot +
+         plot_annotation(title = paste(species, 'diversity'),
+                         caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering loci for MAF (', maf_val,') and missingness (',locus_miss,')')))
+  
+  # Loop for additional plots
   for (i in 1:num_chunks) {
     grid.arrange(table_list[[i]], ncol = 1)
     if (i < num_chunks) {
       cat("\f")  # Start a new page in the PDF
     }
   }
-  cat("\f")
-  plot(combined_stats_plot)
-    # plot_annotation(title = paste(species, 'diversity'),
-    #                 caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering loci for MAF (', maf_val,') and missingness (',locus_miss,')'))
+  
   dev.off()
+  
 } else {
-  page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(13,14,15,1,3:4,6,12)]),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm"))))) |
+  page4 <- (((wrap_elements(gridExtra::tableGrob(stats_to_print,theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm"))))) |
                combined_stats_plot)+
               plot_layout(widths = c(2,3)))+
     plot_annotation(title = paste(species, 'diversity'),
