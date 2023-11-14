@@ -174,4 +174,4 @@ colnames(out_meta)[4] <- "site"
 
 out_meta$none <- "all_species"
 
-# write.xlsx(out_meta, paste0(species, "/meta/", species, "_", dataset, "_meta.xlsx"))
+write.xlsx(out_meta, paste0(species, "/meta/", species, "_", dataset, "_meta.xlsx"))

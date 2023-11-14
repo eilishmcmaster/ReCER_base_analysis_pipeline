@@ -247,7 +247,10 @@ site_map <- base_map+
   geom_point(data=filtered_site_summary,
              mapping=aes(x=long, y=lat, fill=!!sym(site_col_name)), shape=21, size=2)+ 
   theme(legend.key.size = unit(0, 'lines'), legend.position="bottom")+
-  scale_fill_manual(values=site_colours) + site_labels +theme(legend.box = "vertical")
+  scale_fill_manual(values=site_colours) + site_labels +theme(legend.box = "vertical")+
+  if (length(site_categories2) > 20) {
+    theme(legend.position = "none")
+  }
 
 species_map <- base_map+
   geom_point(data=filtered_site_summary,
@@ -420,7 +423,10 @@ pca_plot_pc12_site <- ggplot(g_pca_df2,
   xlab(pcnames[1])+ylab(pcnames[2])+geom_point()+
   pca_labels+  scale_colour_manual(values=site_colours)+ 
   theme(legend.key.size = unit(0, 'lines'))+
-  guides(color = guide_legend(nrow = 4))
+  guides(color = guide_legend(nrow = 4))+
+  if (length(site_categories2) > 20) {
+    theme(legend.position = "none")
+  }
 
 pca_plot_pc23_site <- ggplot(g_pca_df2, 
                              aes(x=PC3, y=PC2,
@@ -436,9 +442,11 @@ pca_plot_pc34_site <- ggplot(g_pca_df2,
   theme(legend.key.size = unit(0, 'lines'))+
   pca_labels
 
+legend_position <- if (length(site_categories2) > 20) "none" else "bottom"
 
-combined_site_pca <- ggarrange(pca_plot_pc12_site, pca_plot_pc23_site, pca_plot_pc34_site, ncol=3, common.legend = TRUE, legend="bottom")
-# combined_site_pca
+combined_site_pca <- ggarrange(
+  pca_plot_pc12_site, pca_plot_pc23_site, pca_plot_pc34_site,
+  ncol = 3, common.legend = TRUE, legend = legend_position)
 
 ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/PCA_",site_col_name,"_all.png"), plot = combined_site_pca, width = 30, height = 10, dpi = 600, units = "cm")
 ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/PCA_",site_col_name,"_PC12.png"), plot = pca_plot_pc12_site, width = 20, height = 15, dpi = 600, units = "cm")
@@ -827,19 +835,111 @@ report <- paste(species_line, pfsnps_line, snps_line,pfsamples_line,samples_line
 
 page1 <- ((wrap_elements(grid::textGrob(report, gp = gpar(fontsize = 16)))/QC_plots) | species_map)+plot_layout(widths = c(3,1 ))
 
-page2 <-(wrap_elements(gridExtra::tableGrob(as.data.frame(final_summary),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm")))) |
-           ggarrange(site_map, pca_plot_pc12_site+theme(aspect.ratio = 4/3), common.legend = TRUE, legend="bottom") ) +
-  plot_layout(widths = c(2,3 ))+
-  plot_annotation(title = paste(species, 'site summary'))
+pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page1.pdf"), width = 11, height = 8.5)
+plot(page1)
+dev.off()
 
+
+##
+
+final_summary_df <- as.data.frame(final_summary)
+
+if (nrow(final_summary_df) > 50) {
+  # Split into chunks of 20 rows each
+  chunk_size <- 60
+  num_chunks <- ceiling(nrow(final_summary_df) / chunk_size)
+  
+  # Create a list to store tables
+  table_list <- vector("list", length = num_chunks)
+  
+  # Loop through chunks and create tables
+  for (i in 1:num_chunks) {
+    start_row <- (i - 1) * chunk_size + 1
+    end_row <- min(i * chunk_size, nrow(final_summary_df))
+    
+    table_list[[i]] <- tableGrob(final_summary_df[start_row:end_row, ], 
+                                 theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm")))
+  }
+  
+  # Create multiple pages with arranged tables
+  pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page2.pdf"))
+  for (i in 1:num_chunks) {
+    grid.arrange(table_list[[i]], ncol = 1)
+    if (i < num_chunks) {
+      cat("\f")  # Start a new page in the PDF
+    }
+  }
+  cat("\f")
+  grid.arrange(ggarrange(site_map, pca_plot_pc12_site+theme(aspect.ratio = 4/3), common.legend = TRUE, legend = legend_position)+
+    plot_annotation(title = paste(species, 'site summary')))
+  dev.off()
+} else {
+  # If less than or equal to 20 rows, plot a single table
+  page2 <-(wrap_elements(gridExtra::tableGrob(as.data.frame(final_summary),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm")))) |
+             ggarrange(site_map, pca_plot_pc12_site+theme(aspect.ratio = 4/3), common.legend = TRUE, legend = legend_position) ) +
+    plot_layout(widths = c(2,3 ))+
+    plot_annotation(title = paste(species, 'site summary'))
+  
+  pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page2.pdf"), width = 11, height = 8.5)
+  plot(page2)
+  dev.off()
+  }
+
+
+##
 page3 <- combined_site_pca/combined_latitude_pca+
   plot_annotation(title = paste(species, 'PCA'))
 
-page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(13,14,15,1,3:4,6,12)]),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm"))))) |
-             combined_stats_plot)+
-            plot_layout(widths = c(2,3)))+
-  plot_annotation(title = paste(species, 'diversity'),
-    caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering loci for MAF (', maf_val,') and missingness (',locus_miss,')'))
+pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page3.pdf"), width = 11, height = 8.5)
+plot(page3)
+dev.off()
+
+###
+stats_to_print <- as.data.frame(site_stats[,c(13,14,15,1,3:4,6,12)])
+
+if (nrow(stats_to_print) > 50) {
+  # Split into chunks of 20 rows each
+  chunk_size <- 60
+  num_chunks <- ceiling(nrow(stats_to_print) / chunk_size)
+  
+  # Create a list to store tables
+  table_list <- vector("list", length = num_chunks)
+  
+  # Loop through chunks and create tables
+  for (i in 1:num_chunks) {
+    start_row <- (i - 1) * chunk_size + 1
+    end_row <- min(i * chunk_size, nrow(stats_to_print))
+    
+    table_list[[i]] <- tableGrob(stats_to_print[start_row:end_row, ], 
+                                 theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm")))
+  }
+  
+  # Create multiple pages with arranged tables
+  pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page4.pdf"))
+  for (i in 1:num_chunks) {
+    grid.arrange(table_list[[i]], ncol = 1)
+    if (i < num_chunks) {
+      cat("\f")  # Start a new page in the PDF
+    }
+  }
+  cat("\f")
+  plot(combined_stats_plot)
+    # plot_annotation(title = paste(species, 'diversity'),
+    #                 caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering loci for MAF (', maf_val,') and missingness (',locus_miss,')'))
+  dev.off()
+} else {
+  page4 <- (((wrap_elements(gridExtra::tableGrob(as.data.frame(site_stats[,c(13,14,15,1,3:4,6,12)]),theme = ttheme_default(base_size = 6, padding = unit(c(2, 2), "mm"))))) |
+               combined_stats_plot)+
+              plot_layout(widths = c(2,3)))+
+    plot_annotation(title = paste(species, 'diversity'),
+                    caption = paste0('Note: Samples are grouped by ', species_col_name, ' before filtering loci for MAF (', maf_val,') and missingness (',locus_miss,')'))
+  
+  pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page4.pdf"), width = 11, height = 8.5)
+  plot(page4)
+  dev.off()
+}
+###
+
 
 page5 <-  arranged_scatterpie_plots + plot_annotation( title = paste(species, 'LEA plots') )
 
@@ -850,15 +950,15 @@ page6 <-  (entropy_plot+theme(aspect.ratio = 2/3) | fst_manning) +
                                     or the best model run for a fixed K value.'))
 
 pdf(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/intermediate_plots.pdf"), width = 11, height = 8.5)
-plot(page1)
-plot(page2)
-plot(page3)
-plot(page4)
 plot(page5)
 plot(page6)
 dev.off()
 
-pdfs_to_combine <- c(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/intermediate_plots.pdf"),
+pdfs_to_combine <- c(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page1.pdf"),
+                     paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page2.pdf"),
+                     paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page3.pdf"),
+                     paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page4.pdf"),
+                     paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/intermediate_plots.pdf"),
                      paste0(species, "/outputs_",site_col_name,"_",species_col_name,"/plots/FST_heatmap.pdf"),
                      paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA_barplots.pdf")  
 )
@@ -866,4 +966,8 @@ pdfs_to_combine <- c(paste0(species,"/outputs_",site_col_name,"_",species_col_na
 qpdf::pdf_combine(input = pdfs_to_combine,
                   output = paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/",species,"_combined_outputs.pdf"))
 
-file.remove(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/intermediate_plots.pdf"))
+file.remove(c(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page1.pdf"),
+              paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page2.pdf"),
+              paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page3.pdf"),
+              paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/page4.pdf"),
+              paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/intermediate_plots.pdf")))
