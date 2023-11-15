@@ -16,7 +16,7 @@ species_col_name <- setup_variables[5, 2]
 site_col_name <- setup_variables[6, 2] # this is the equivalent of analysis
 site_distances <- setup_variables[7, 2] %>% as.numeric()
 remove_pops_less_than_n5 <- setup_variables[8, 2]
-downsample <- setup_variables[9, 2] %>% as.numeric()
+downsample <- setup_variables[9, 2]
 samples_per_pop <- setup_variables[10, 2] %>% as.numeric()
 locus_miss <- setup_variables[11, 2] %>% as.numeric()
 sample_miss <- setup_variables[12, 2] %>% as.numeric()
