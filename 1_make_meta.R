@@ -14,15 +14,15 @@ RandRbase <- ""
 raw_meta_path <- setup_variables[4, 2]
 species_col_name <- setup_variables[5, 2]
 site_col_name <- setup_variables[6, 2] # this is the equivalent of analysis
-site_distances <- setup_variables[7, 2]
+site_distances <- setup_variables[7, 2] %>% as.numeric()
 remove_pops_less_than_n5 <- setup_variables[8, 2]
-downsample <- setup_variables[9, 2]
+downsample <- setup_variables[9, 2] %>% as.numeric()
 samples_per_pop <- setup_variables[10, 2] %>% as.numeric()
 locus_miss <- setup_variables[11, 2] %>% as.numeric()
 sample_miss <- setup_variables[12, 2] %>% as.numeric()
 maf_val <- setup_variables[13, 2] %>% as.numeric()
 clonal_threshold <- setup_variables[14, 2] %>% as.numeric()
-custom_meta <- setup_variables[15, 2]
+custom_meta <- setup_variables[15, 2] 
 
 
 #####################  check for subdirs and make ##################### 
@@ -81,23 +81,14 @@ working_meta <- working_meta %>%
 working_meta <- working_meta[working_meta$sample %in% d1$sample_names,]
 working_meta2 <- working_meta[!is.na(working_meta$lat)&!is.na(working_meta$long),]
 
+library(geosphere)
 
-S <- mat.or.vec(nrow(working_meta2),nrow(working_meta2) )
-for (i in 1:nrow(working_meta2)) {
-  for (j in 1:nrow(working_meta2)) {
-    if (i > j) {
-      LLi <- working_meta2[i, c("long","lat")]
-      LLj <- working_meta2[j, c("long","lat")]
-      Dij <- distCosine(as.numeric(LLi), as.numeric(LLj))
-      S[i, j] <- Dij
-      S[j, i] <- Dij
-    }
-  }
-}
+S <- distm(x = cbind(working_meta2$long, working_meta2$lat), fun = geosphere::distHaversine)
+
 colnames(S) <- working_meta2$sample
 rownames(S) <- working_meta2$sample
 
-distance_mat <-S/1000
+distance_mat <- S/1000
 # group samples <1km apart
 
 distance_mat2 <- ifelse(distance_mat <= site_distances, 1, 0)
