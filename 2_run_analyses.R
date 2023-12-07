@@ -751,8 +751,8 @@ ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA
 
 ####################################### DIVERSITY ######################################
 site_stats <- species_site_stats(dms, maf=maf_val, pop_var=species_col_name, site_var=site_col_name, missing=locus_miss)
-colnames(site_stats)[1] <- site_col_name
-colnames(site_stats)[14] <- species_col_name
+colnames(site_stats)[which(colnames(site_stats)=="site")] <- site_col_name
+colnames(site_stats)[which(colnames(site_stats)=="genetic_group")] <- species_col_name
 site_stats_merged <- merge(site_stats, final_summary[,c(1:4)], by=site_col_name)
 
 site_stats_merged <-site_stats_merged[order(match(site_stats_merged[,site_col_name], site_categories2)),]
@@ -896,7 +896,8 @@ plot(page3)
 dev.off()
 
 ###
-stats_to_print <- as.data.frame(site_stats[,c(13,14,15,1,3:4,6,12)])
+stats_cols_to_print <- c(species_col_name, site_col_name, "ar","obs_het", "exp_het", "fis",  "loci", "n")
+stats_to_print <- as.data.frame(site_stats[,stats_cols_to_print])
 
 if (nrow(stats_to_print) > 40) {
   # Split into chunks of 20 rows each
