@@ -617,6 +617,12 @@ write.xlsx(list(geo_dist_km=mat, fst=mat2),
 
 
 ###########################################  Visualise splitstree ########################################### 
+# # if you want to rename splitstree leaves with an extra parameter:
+# dms_splitstree <- dms
+# rownames(dms_splitstree$gt) <- paste(rownames(dms_splitstree$gt),
+#                                       dms_splitstree$meta$analyses[,species_col_name],sep="_")
+# # then use dms_splitstree$gt instead of dms$gt in the line below
+
 ## site splitstree
 splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
 # 
