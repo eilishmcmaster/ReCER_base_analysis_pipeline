@@ -60,7 +60,7 @@ maf_val <- setup_variables[13, 2] %>% as.numeric()
 clonal_threshold <- setup_variables[14, 2] %>% as.numeric()
 custom_meta <- setup_variables[15, 2] 
 
-setwd(maindir)
+# setwd(maindir)
 
 topskip   <- 6
 nmetavar  <- 18
@@ -623,24 +623,26 @@ write.xlsx(list(geo_dist_km=mat, fst=mat2),
 #                                       dms_splitstree$meta$analyses[,species_col_name],sep="_")
 # # then use dms_splitstree$gt instead of dms$gt in the line below
 
-## site splitstree
-splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
-# 
+# # site splitstree
+# # Write the splitstree to a local file, then open in Splitstree software and save
+# splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
+# # Re-import file that has been transformed by opening in Splitstree software
 # Nnet <- phangorn::read.nexus.networx(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
-# 
+# # Turn data into data frame
 # x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2],
 #                 sample=rep(NA, nrow(Nnet$.plot$vertices)))
-# 
+# # add sample labels to tips
 # x[Nnet$translate$node,"sample"] <- Nnet$translate$label
-# x <- merge(x, dms$meta$analyses, by="sample", all.x=TRUE, all.y=FALSE)
-# 
+# # add metadata to splitstree dataframe
+# x <- merge(x, as.data.frame(dms$meta$analyses), by="sample", all.x=TRUE, all.y=FALSE)
+# # Make limits for the splistree plot axes
 # net_x_axis <- max(x$x)-min(x$x)
 # net_y_axis <- max(x$y)-min(x$y)
-# 
+# # OPTIONAL: change tip label from sample name to other variable, in this case site_col_name
+# # the tip colour will not work if you don't change the labels
 # Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .[1:length(Nnet$tip.label)]
 # 
-# 
-# 
+# # Plot the splitstree colouring tips by site colours
 # splitstree_plot_site <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL,
 #                                   as.Date = FALSE, yscale = "none", yscale_mapping = NULL,
 #                                   ladderize = FALSE, right = FALSE, branch.length = "branch.length",
@@ -657,9 +659,8 @@ splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_co
 # 
 # splitstree_plot_site
 # 
-# 
 # ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
-
+# 
 
 ########################################### LEA ########################################
 kvalrange <- 2:7
