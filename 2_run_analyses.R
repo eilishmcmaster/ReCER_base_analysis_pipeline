@@ -90,27 +90,27 @@ devtools::source_url("https://github.com/eilishmcmaster/SoS_functions/blob/main/
 
 #Load data and quality filter loci and samples
 d1        <- new.read.dart.xls.onerow(RandRbase,species,dataset,topskip, euchits=FALSE, altcount=TRUE)
-qc1       <- report.dart.qc.stats(d1, RandRbase, species, dataset, threshold_missing_loci = 0.8)
 
-d2        <- remove.poor.quality.snps(d1, min_repro=0.96, max_missing=locus_miss)
+#Load meta data and attach to dart data
+m1        <- read.meta.data.full.analyses.df(d1, RandRbase, species, dataset)
+
+write.table(data.frame(sample=d1$sample_names[!(d1$sample_names %in% m1$sample_names)]), 
+            paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/samples_in_dart_not_in_meta.tsv"), sep="\t", row.names = FALSE)
+
+d1.1        <- dart.meta.data.merge(d1, m1)
+
+#Continue QC and filtering on just target samples
+qc1       <- report.dart.qc.stats(d1.1, RandRbase, species, dataset, threshold_missing_loci = 0.8)
+
+d2        <- remove.poor.quality.snps(d1.1, min_repro=0.96, max_missing=locus_miss)
 qc2       <- report.dart.qc.stats(d2, RandRbase, species, dataset)
 
 d3        <- sample.one.snp.per.locus.random(d2, seed=214241)
 qc3       <- report.dart.qc.stats(d3, RandRbase, species, dataset)
 
-#Load meta data and attach to dart data
-m1        <- read.meta.data.full.analyses.df(d3, RandRbase, species, dataset)
-
-write.table(data.frame(sample=d3$sample_names[!(d3$sample_names %in% m1$sample_names)]), 
-            paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/tables/samples_in_dart_not_in_meta.tsv"), sep="\t", row.names = FALSE)
-
-dm        <- dart.meta.data.merge(d3, m1)
-
 # remove samples that are NA for site variable 
-samples_with_site_variable <- dm$sample_names[!is.na(dm$meta$analyses[,site_col_name])]
-dms2 <- remove.by.list(dm, samples_with_site_variable)
-
-
+samples_with_site_variable <- d3$sample_names[!is.na(d3$meta$analyses[,site_col_name])]
+dms2 <- remove.by.list(d3, samples_with_site_variable)
 
 dms <- dms2
 treatment <- dms$treatment
