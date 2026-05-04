@@ -4,7 +4,8 @@ library(RColorBrewer)
 library(circlize) 
 library(scatterpie)
 library(tanggle)
-library(RSplitsTree)
+library(fastnntr)
+# library(RSplitsTree)
 # library(ggmap)
 # library(lubridate)
 library(ggplot2)
@@ -59,6 +60,9 @@ sample_miss <- setup_variables[12, 2] %>% as.numeric()
 maf_val <- setup_variables[13, 2] %>% as.numeric()
 clonal_threshold <- setup_variables[14, 2] %>% as.numeric()
 custom_meta <- setup_variables[15, 2] 
+
+
+remove_clones <- TRUE 
 
 # setwd(maindir)
 
@@ -391,6 +395,19 @@ pdf(filename, width = heatmap_width, height = heatmap_height)
 draw(dist_heatmap_plot, merge_legend = TRUE)
 dev.off()
 
+##################################### Remove clones from dms ##########################################
+
+if(isTRUE(remove_clones)){
+  dms <- remove.by.list(dms, 
+                                  clones_out %>%
+                                    mutate(missingness = rowSums(is.na(dms$gt)) / ncol(dms$gt)) %>%
+                                    arrange(missingness) %>%
+                                    distinct(genet, .keep_all = TRUE) %>%
+                                    pull(sample)
+  )
+  
+}
+
 ################################################ PCA ################################################ 
 
 dms_1000 <- remove.loci.randomly(dms, 1000)
@@ -628,39 +645,42 @@ write.xlsx(list(geo_dist_km=mat, fst=mat2),
 # splitstree(dist(dms$gt), paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
 # # Re-import file that has been transformed by opening in Splitstree software
 # Nnet <- phangorn::read.nexus.networx(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/r_files/",species,"_",dataset,".nex"))
-# # Turn data into data frame
-# x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2],
-#                 sample=rep(NA, nrow(Nnet$.plot$vertices)))
-# # add sample labels to tips
-# x[Nnet$translate$node,"sample"] <- Nnet$translate$label
-# # add metadata to splitstree dataframe
-# x <- merge(x, as.data.frame(dms$meta$analyses), by="sample", all.x=TRUE, all.y=FALSE)
-# # Make limits for the splistree plot axes
-# net_x_axis <- max(x$x)-min(x$x)
-# net_y_axis <- max(x$y)-min(x$y)
+
+dist_mx <- dist(dms$gt) %>% as.matrix()
+Nnet <- fastnntr::run_neighbournet_networkx(dist_mx)
+
+# Turn data into data frame
+x <- data.frame(x=Nnet$.plot$vertices[,1], y=Nnet$.plot$vertices[,2],
+                sample=rep(NA, nrow(Nnet$.plot$vertices)))
+# add sample labels to tips
+x[Nnet$translate$node,"sample"] <- Nnet$translate$label
+# add metadata to splitstree dataframe
+x <- merge(x, as.data.frame(dms$meta$analyses), by="sample", all.x=TRUE, all.y=FALSE)
+# Make limits for the splistree plot axes
+net_x_axis <- max(x$x)-min(x$x)
+net_y_axis <- max(x$y)-min(x$y)
 # # OPTIONAL: change tip label from sample name to other variable, in this case site_col_name
 # # the tip colour will not work if you don't change the labels
 # Nnet$translate$label <-  x[match(Nnet$tip.label, x$sample), site_col_name] %>% .[1:length(Nnet$tip.label)]
-# 
-# # Plot the splitstree colouring tips by site colours
-# splitstree_plot_site <- ggplot(Nnet, mapping = aes_(~x, ~y), layout = "slanted", mrsd = NULL,
-#                                   as.Date = FALSE, yscale = "none", yscale_mapping = NULL,
-#                                   ladderize = FALSE, right = FALSE, branch.length = "branch.length",
-#                                   ndigits = NULL)+
-#   geom_splitnet(layout = "slanted", size=0.2)+
-#   geom_point(data=x, aes(x, y, colour=!!sym(site_col_name)))+
-#   scale_colour_manual(values=site_colours, na.translate=FALSE,
-#                       guide = guide_legend(site_col_name))+
-#   geom_tiplab2(size=2, hjust=-2)+
-#   theme_void()+
-#   expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
-#                 y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
-#   theme(legend.text = element_text(face="italic"), legend.position = "none")+coord_fixed()
-# 
-# splitstree_plot_site
-# 
-# ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
-# 
+
+# Plot the splitstree colouring tips by site colours
+splitstree_plot_site <- ggplot(Nnet)+
+  tanggle::geom_splitnet()+
+  geom_point(data=x, aes(x, y, colour=!!sym(site_col_name)))+
+  scale_colour_manual(values=site_colours, na.translate=FALSE,
+                      guide = guide_legend(site_col_name))+
+  geom_tiplab2(size=2, hjust=-2)+
+  theme_void()+
+  expand_limits(x=c(min(x$x)-0.01*net_x_axis, max(x$x)+0.01*net_x_axis),
+                y=c(min(x$y)-0.01*net_y_axis, max(x$y)+0.01*net_y_axis))+
+  theme(legend.text = element_text(face="italic"), legend.position = "none")+coord_fixed()
+
+splitstree_plot_site
+
+ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/small_splitstree.png"), plot = splitstree_plot_site, width = 20, height = 30, dpi = 600, units = "cm")
+
+
+
 
 ########################################### LEA ########################################
 kvalrange <- 2:7
