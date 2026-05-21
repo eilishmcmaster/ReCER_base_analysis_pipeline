@@ -35,7 +35,8 @@ library(RColorBrewer)
 library(ozmaps)
 library(adegenet)
 library(tidyr)
-library(diveRsity)
+# library(diveRsity)
+library(fastDiversity) # remotes::install_github("eilishmcmaster/fastDiversity", build_vignettes = TRUE)
 library(RRtools)
 library(LEA)
 
@@ -777,7 +778,16 @@ ggsave(paste0(species,"/outputs_",site_col_name,"_",species_col_name,"/plots/LEA
 
 
 ####################################### DIVERSITY ######################################
-site_stats <- species_site_stats(dms, maf=maf_val, pop_var=species_col_name, site_var=site_col_name, missing=locus_miss)
+# site_stats <- species_site_stats(dms, maf=maf_val, pop_var=species_col_name, site_var=site_col_name, missing=locus_miss)
+
+site_stats <- fastDiversity::faststats(dms$gt, 
+                                       site_variable = dms$meta$analyses[,site_col_name],
+                                       genetic_group_variable = dms$meta$analyses[,species_col_name], 
+                                       missing=locus_miss, 
+                                       maf=maf_val)
+
+site_stats[3:ncol(site_stats)] <- lapply(site_stats[3:ncol(site_stats)], as.numeric)
+
 colnames(site_stats)[which(colnames(site_stats)=="site")] <- site_col_name
 colnames(site_stats)[which(colnames(site_stats)=="genetic_group")] <- species_col_name
 site_stats_merged <- merge(site_stats, final_summary[,c(1:4)], by=site_col_name)
@@ -790,10 +800,12 @@ write.xlsx(site_stats_merged,
 
 
 # Find the maximum of the two size variables
-het_range <- range(min(site_stats_merged[,c('obs_het', 'exp_het')], na.rm=TRUE), max(site_stats_merged[,c('obs_het', 'exp_het')], na.rm=TRUE))
+# het_range <- range(min(site_stats_merged[,c('obs_het', 'exp_het')], na.rm=TRUE), max(site_stats_merged[,c('obs_het', 'exp_het')], na.rm=TRUE))
+het_range <- range(min(site_stats_merged[,c('Ho', 'He')], na.rm=TRUE),
+                   max(site_stats_merged[,c('Ho', 'He')], na.rm=TRUE))
 
 ho_map <- base_map + #site_labels+
-  geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size = obs_het), alpha = 0.3, color = "red") +
+  geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size = Ho), alpha = 0.3, color = "red") +
   geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
   theme(legend.position = "bottom", legend.direction = "vertical", 
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
@@ -801,7 +813,7 @@ ho_map <- base_map + #site_labels+
   scale_size_continuous(limits = het_range)
 
 he_map <- base_map + #site_labels+
-  geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size =exp_het), alpha = 0.3, color = "red") +
+  geom_point(data = site_stats_merged, mapping = aes(x = long, y = lat, size =He), alpha = 0.3, color = "red") +
   geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
   theme(legend.position = "bottom", legend.direction = "vertical",
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
@@ -809,7 +821,7 @@ he_map <- base_map + #site_labels+
   scale_size_continuous(limits = het_range)
 
 fis_map <- base_map + #site_labels+
-  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, size=fis, color=fis), alpha=0.5)+ 
+  geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat, size=Fis, color=Fis), alpha=0.5)+ 
   scale_color_gradient2(high = "red",mid="white", midpoint = 0, low = "blue", na.value = "grey30")+
   geom_point(data=site_stats_merged, mapping=aes(x=long, y=lat),size=0.1)+
   theme(legend.position = "bottom", legend.direction = "vertical",
